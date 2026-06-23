@@ -37,12 +37,12 @@ function VerifyForm() {
 
   function handlePaste(index: number, e: React.ClipboardEvent) {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6 - index);
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     if (!pasted) return;
     const next = [...digits];
-    for (let i = 0; i < pasted.length; i++) next[index + i] = pasted[i];
+    for (let i = 0; i < pasted.length; i++) next[i] = pasted[i];
     setDigits(next);
-    const target = Math.min(index + pasted.length, 5);
+    const target = Math.min(pasted.length, 5);
     refs.current[target]?.focus();
   }
 
