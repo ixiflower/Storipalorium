@@ -28,9 +28,8 @@ export const items = pgTable('items', {
   roomId: uuid('room_id').references(() => rooms.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
   link: text('link').default(''),
-  category: text('category', { enum: ['notes', 'links', 'media'] })
-    .notNull()
-    .default('notes'),
+  category: text('category').notNull().default('notes'),
+  tags: text('tags').default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
