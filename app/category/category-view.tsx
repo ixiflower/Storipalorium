@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen } from 'lucide-react';
 
 type Item = {
   id: string; title: string; link: string | null; category: string;
@@ -11,92 +11,102 @@ type Item = {
 type Room = { id: string; name: string; code: string };
 type SortMode = 'newest' | 'oldest' | 'name';
 
-function ItemCard({ item, onDelete }: { item: Item; onDelete: (id: string) => void }) {
-  const [hover, setHover] = useState(false);
+function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
   const [deleting, setDeleting] = useState(false);
+  const tagList = item.tags ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
   const handleDelete = async () => {
     setDeleting(true);
     const r = await fetch(`/api/items?id=${item.id}`, { method: 'DELETE' });
-    if (r.ok) onDelete(item.id);
-    setDeleting(false);
+    if (r.ok) window.location.reload();
+    else setDeleting(false);
   };
-  const tagList = item.tags ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
   return (
-    <div className="border-secondary border-t border-l border-r-6 border-b-6 p-5 relative group"
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <div className="text-foreground text-lg mb-1 pr-8">{item.title}</div>
-      {item.link && (
-        <a href={item.link} target="_blank" rel="noopener noreferrer"
-          className="text-accent text-sm hover:underline break-all">{item.link}</a>
-      )}
-      {tagList.length > 0 && (
-        <div className="flex gap-1.5 mt-2 flex-wrap">
-          {tagList.map(t => (
-            <span key={t} className="text-foreground/30 text-xs border-secondary border px-1.5 py-0.5">
-              {t.startsWith('#') ? t : '#' + t}
-            </span>
-          ))}
+    <div className="group flex items-start gap-2 py-2 px-2 hover:bg-foreground/[0.03] transition-colors" style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}>
+      <span className="text-foreground/15 shrink-0 mt-0.5">└</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-foreground/70 text-sm">{item.title}</div>
+        {item.link && (
+          <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-accent/60 text-xs hover:underline break-all">{item.link}</a>
+        )}
+        {tagList.length > 0 && (
+          <div className="flex gap-1 mt-1 flex-wrap">
+            {tagList.map(t => <span key={t} className="text-foreground/20 text-xs">{t.startsWith('#') ? t : '#' + t}</span>)}
+          </div>
+        )}
+      </div>
+      <button onClick={handleDelete} disabled={deleting}
+        className="opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-destructive transition-all shrink-0 mt-0.5">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function CategoryNode({ name, items, depth }: { name: string; items: Item[]; depth: number }) {
+  const [open, setOpen] = useState(true);
+  const indent = depth * 1.5;
+
+  return (
+    <div>
+      <button onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 py-1.5 hover:text-foreground transition-colors w-full text-left"
+        style={{ paddingLeft: `${indent}rem` }}>
+        {open ? <ChevronDown className="w-4 h-4 text-foreground/30 shrink-0" /> : <ChevronRight className="w-4 h-4 text-foreground/30 shrink-0" />}
+        {open ? <FolderOpen className="w-4 h-4 text-foreground/30 shrink-0" /> : <Folder className="w-4 h-4 text-foreground/30 shrink-0" />}
+        <span className="text-foreground/50 text-sm">{name}</span>
+        <span className="text-foreground/20 text-xs">({items.length})</span>
+      </button>
+      {open && (
+        <div>
+          {items.map(item => <ItemLeaf key={item.id} item={item} depth={depth + 1} />)}
         </div>
-      )}
-      {hover && (
-        <button onClick={handleDelete} disabled={deleting}
-          className="absolute top-3 right-3 text-foreground/20 hover:text-destructive transition-colors p-1" title="Delete item">
-          <Trash2 className="w-4 h-4" />
-        </button>
       )}
     </div>
   );
 }
 
-function Section({ title, items: allItems, defaultOpen = true }: {
-  title: string; items: Item[]; defaultOpen?: boolean;
-}) {
+function SectionNode({ title, items, depth, defaultOpen }: { title: string; items: Item[]; depth: number; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [sort, setSort] = useState<SortMode>('newest');
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const visible = useMemo(() => {
-    const f = allItems.filter(i => !deletedIds.has(i.id));
+
+  const sorted = useMemo(() => {
+    const list = [...items];
     switch (sort) {
-      case 'newest': return [...f].reverse();
-      case 'oldest': return f;
-      case 'name': return [...f].sort((a, b) => a.title.localeCompare(b.title));
+      case 'newest': return list.reverse();
+      case 'oldest': return list;
+      case 'name': return list.sort((a, b) => a.title.localeCompare(b.title));
     }
-  }, [allItems, sort, deletedIds]);
-  const groupByCat = (list: Item[]) => {
-    const cats: Record<string, Item[]> = {};
-    for (const i of list) (cats[i.category] ||= []).push(i);
-    return cats;
-  };
-  const grouped = groupByCat(visible);
+  }, [items, sort]);
+
+  const grouped: Record<string, Item[]> = {};
+  for (const i of sorted) (grouped[i.category] ||= []).push(i);
+
+  const indent = depth * 1.5;
   const sb = "text-foreground/30 hover:text-foreground transition-colors p-0.5";
+
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <button onClick={() => setOpen(!open)} className="text-foreground/40 hover:text-foreground transition-colors">
+      <div className="flex items-center gap-2 py-2" style={{ paddingLeft: `${indent}rem` }}>
+        <button onClick={() => setOpen(!open)} className="text-foreground/40 hover:text-foreground transition-colors shrink-0">
           {open ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
         </button>
-        <h2 className="text-xl md:text-2xl text-foreground/60">{title}</h2>
-        <span className="text-foreground/20 text-sm">{visible.length}</span>
-        {open && visible.length > 0 && (
+        {open ? <FolderOpen className="w-4 h-4 text-foreground/30 shrink-0" /> : <Folder className="w-4 h-4 text-foreground/30 shrink-0" />}
+        <span className="text-lg text-foreground/60">{title}</span>
+        <span className="text-foreground/20 text-xs">({items.length})</span>
+        {open && items.length > 0 && (
           <div className="flex items-center gap-1 ml-auto">
-            <button onClick={() => setSort('newest')} className={sort === 'newest' ? `${sb} text-accent` : sb} title="Newest"><Clock className="w-3.5 h-3.5" /></button>
-            <button onClick={() => setSort('oldest')} className={sort === 'oldest' ? `${sb} text-accent` : sb} title="Oldest"><ArrowUpDown className="w-3.5 h-3.5" /></button>
-            <button onClick={() => setSort('name')} className={sort === 'name' ? `${sb} text-accent` : sb} title="A-Z"><Type className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setSort('newest')} className={sort === 'newest' ? `${sb} text-accent` : sb} title="Newest"><Clock className="w-3 h-3" /></button>
+            <button onClick={() => setSort('oldest')} className={sort === 'oldest' ? `${sb} text-accent` : sb} title="Oldest"><ArrowUpDown className="w-3 h-3" /></button>
+            <button onClick={() => setSort('name')} className={sort === 'name' ? `${sb} text-accent` : sb} title="A-Z"><Type className="w-3 h-3" /></button>
           </div>
         )}
       </div>
       {open && (
-        <div className="space-y-20">
-          {Object.entries(grouped).map(([cat, ci]) => (
-            <div key={cat}>
-              <div className="flex items-center gap-3 mb-6">
-                <h3 className="text-lg text-foreground/50">{cat}</h3>
-                <span className="text-foreground/20 text-xs">{ci.length}</span>
-              </div>
-              <div className="space-y-3">
-                {ci.map(item => <ItemCard key={item.id} item={item} onDelete={(id) => setDeletedIds(p => new Set(p).add(id))} />)}
-              </div>
-            </div>
+        <div>
+          {Object.entries(grouped).map(([cat, catItems]) => (
+            <CategoryNode key={cat} name={cat} items={catItems} depth={depth + 1} />
           ))}
         </div>
       )}
@@ -138,7 +148,7 @@ export function CategoryView({
 
   return (
     <div className="min-h-screen pt-24 px-8 md:px-16 pb-20">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <div className="mb-10">
           <h1 className="text-4xl md:text-6xl text-foreground mb-4">Categories</h1>
           <p className="text-foreground/60 text-lg">
@@ -159,7 +169,7 @@ export function CategoryView({
             )}
           </div>
           {results && (
-            <div className="absolute top-14 left-0 right-0 z-10 bg-background border-secondary border-t border-l border-r-6 border-b-6 max-h-96 overflow-y-auto shadow-lg">
+            <div className="absolute top-14 left-0 right-0 z-10 bg-background border-secondary border-t border-l border-r-6 border-b-6 max-h-96 overflow-y-auto">
               <div className="p-2 text-foreground/30 text-xs">{results.length} result{results.length !== 1 ? 's' : ''}</div>
               {results.length === 0 ? (
                 <div className="p-4 text-foreground/40 text-sm">Nothing found</div>
@@ -192,12 +202,14 @@ export function CategoryView({
         ) : isSearching ? (
           results && results.length > 0 ? null : <div className="text-center py-12 text-foreground/40">Type to search across all your items</div>
         ) : (
-          <div className="space-y-16">
-            {privateItems.length > 0 && <Section title="Private" items={privateItems} defaultOpen={true} />}
+          <div className="space-y-6 border-l border-foreground/10 pl-2">
+            {privateItems.length > 0 && (
+              <SectionNode title="Private" items={privateItems} depth={0} defaultOpen={true} />
+            )}
             {userRooms.map(room => {
               const ri = roomItemsMap[room.id] || [];
               if (ri.length === 0) return null;
-              return <Section key={room.id} title={room.name} items={ri} defaultOpen={true} />;
+              return <SectionNode key={room.id} title={room.name} items={ri} depth={0} defaultOpen={ri.length > 0} />;
             })}
           </div>
         )}
