@@ -1,0 +1,8 @@
+CREATE TABLE "items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" text NOT NULL,
+	"title" text NOT NULL,
+	"link" text DEFAULT '',
+	"category" text DEFAULT 'notes' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now()
+);
