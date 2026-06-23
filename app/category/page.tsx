@@ -11,7 +11,7 @@ export default async function CategoryPage() {
   const { data: session } = await auth.getSession();
   if (!session?.user) redirect('/login');
 
-  // Fetch private items
+  // Fetch private items (user's own, no room)
   const privateItems = await db
     .select()
     .from(items)
@@ -25,13 +25,13 @@ export default async function CategoryPage() {
     .innerJoin(roomMembers, eq(rooms.id, roomMembers.roomId))
     .where(eq(roomMembers.userId, session.user.id));
 
-  // Fetch items per room
+  // Fetch ALL items per room (shared — no userId filter)
   const roomItemsMap: Record<string, typeof privateItems> = {};
   for (const room of userRooms) {
     roomItemsMap[room.id] = await db
       .select()
       .from(items)
-      .where(and(eq(items.userId, session.user.id), eq(items.roomId, room.id)))
+      .where(eq(items.roomId, room.id))
       .orderBy(items.createdAt);
   }
 
@@ -90,7 +90,6 @@ export default async function CategoryPage() {
           </div>
         ) : (
           <div className="space-y-24">
-            {/* Private items */}
             {privateItems.length > 0 && (
               <div>
                 <h2 className="text-xl text-foreground/40 mb-10">Private</h2>
@@ -102,7 +101,6 @@ export default async function CategoryPage() {
               </div>
             )}
 
-            {/* Room items */}
             {userRooms.map(room => {
               const roomItems = roomItemsMap[room.id] || [];
               if (roomItems.length === 0) return null;

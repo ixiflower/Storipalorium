@@ -18,7 +18,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Title and category are required' }, { status: 400 });
     }
 
-    // If roomId is provided, verify user is a member
     if (roomId) {
       const member = await db
         .select()
@@ -56,14 +55,30 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const roomId = searchParams.get('roomId');
 
+    if (roomId) {
+      // Verify membership first
+      const member = await db
+        .select()
+        .from(roomMembers)
+        .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, session.user.id)))
+        .limit(1);
+      if (!member.length) {
+        return NextResponse.json({ error: 'Not a member of this room' }, { status: 403 });
+      }
+      // Fetch ALL items in the room (shared visibility)
+      const roomItems = await db
+        .select()
+        .from(items)
+        .where(eq(items.roomId, roomId))
+        .orderBy(items.createdAt);
+      return NextResponse.json({ items: roomItems });
+    }
+
+    // Private items (no roomId)
     const userItems = await db
       .select()
       .from(items)
-      .where(
-        roomId
-          ? and(eq(items.userId, session.user.id), eq(items.roomId, roomId))
-          : and(eq(items.userId, session.user.id), isNull(items.roomId))
-      )
+      .where(and(eq(items.userId, session.user.id), isNull(items.roomId)))
       .orderBy(items.createdAt);
 
     return NextResponse.json({ items: userItems });
