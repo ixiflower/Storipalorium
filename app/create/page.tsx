@@ -25,6 +25,7 @@ export default function CreatePage() {
   const [link, setLink] = useState('');
   const [category, setCategory] = useState('notes');
   const [customCat, setCustomCat] = useState('');
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [tags, setTags] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -62,7 +63,7 @@ export default function CreatePage() {
       const res = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (res.status === 401) { router.push('/login'); return; }
       if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to save'); return; }
-      setOpen(false); setTitle(''); setLink(''); setCategory('notes'); setCustomCat(''); setTags('');
+      setOpen(false); setTitle(''); setLink(''); setCategory('notes'); setCustomCat(''); setIsCustomCategory(false); setTags('');
       router.refresh();
     } catch { setError('Network error.'); }
     finally { setSaving(false); }
@@ -187,13 +188,13 @@ export default function CreatePage() {
               className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl min-h-48" />
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">Category</label>
             <div className="space-y-2">
-              <select value={customCat ? '__custom__' : category} onChange={(e) => { const v = e.target.value; if (v === '__custom__') { setCustomCat(''); } else { setCategory(v); setCustomCat(''); } }}
+              <select value={isCustomCategory ? '__custom__' : category} onChange={(e) => { const v = e.target.value; if (v === '__custom__') { setIsCustomCategory(true); setCategory(''); } else { setIsCustomCategory(false); setCategory(v); setCustomCat(''); } }}
                 className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14">
                 {defaultCategories.map(c => <option key={c} className="bg-background text-foreground" value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                 <option className="bg-background text-accent" value="__custom__">+ Create new...</option>
               </select>
-              {(!defaultCategories.includes(category) || customCat !== '') && (
-                <input value={customCat || category} onChange={(e) => { setCustomCat(e.target.value); if (!customCat) setCategory(e.target.value); }}
+              {(isCustomCategory || !defaultCategories.includes(category)) && (
+                <input value={customCat || category} onChange={(e) => { setCustomCat(e.target.value); setCategory(e.target.value); }}
                   placeholder="Custom category name" autoFocus
                   className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14" />
               )}
