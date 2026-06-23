@@ -79,6 +79,7 @@ function VerifyForm() {
           </div>
 
           <form action={formAction} className="space-y-6">
+            <input type="hidden" name="email" value={email} />
             <input type="hidden" name="otp" value={digits.join('')} />
 
             <div className="space-y-4">
