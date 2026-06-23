@@ -1,13 +1,59 @@
-"use client";
+'use client';
 
-import { useState, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 export default function CreatePage() {
   const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [link, setLink] = useState('');
+  const [category, setCategory] = useState('notes');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const openMenu = useCallback(() => setOpen(true), []);
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      setError('Title is required');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim(), link: link.trim(), category }),
+      });
+
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to save');
+        return;
+      }
+
+      setOpen(false);
+      setTitle('');
+      setLink('');
+      setCategory('notes');
+      router.refresh();
+    } catch {
+      setError('Network error. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -28,7 +74,7 @@ export default function CreatePage() {
               variant="outline"
               size="lg"
               onClick={openMenu}
-              className="w-full h-28 px-16 text-2xl text-foreground! border-foreground! border-t border-l border-r-6 border-b-6"
+              className="w-full h-28 px-16 text-2xl text-foreground border-foreground border-t border-l border-r-6 border-b-6"
             >
               UPLOAD
             </Button>
@@ -37,7 +83,7 @@ export default function CreatePage() {
               variant="outline"
               size="lg"
               onClick={openMenu}
-              className="w-full h-28 px-16 text-2xl text-foreground! border-secondary! border-t border-l border-r-6 border-b-6"
+              className="w-full h-28 px-16 text-2xl text-foreground border-secondary border-t border-l border-r-6 border-b-6"
             >
               PASTE
             </Button>
@@ -59,17 +105,30 @@ export default function CreatePage() {
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">
               Title
             </label>
-            <input className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14" />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14"
+              autoFocus
+            />
 
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">
               Link
             </label>
-            <textarea className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl min-h-48" />
+            <textarea
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl min-h-48"
+            />
 
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">
               Category
             </label>
-            <select className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14"
+            >
               <option className="bg-background text-foreground" value="notes">
                 Notes
               </option>
@@ -81,20 +140,29 @@ export default function CreatePage() {
               </option>
             </select>
           </div>
+
+          {error && (
+            <div className="mt-4 text-destructive text-sm">{error}</div>
+          )}
+
           <div className="mt-10 flex justify-end gap-6">
             <Button
               variant="outline"
-              className="px-8 py-3 text-xl text-foreground! border-foreground! border-t border-l border-r-6 border-b-6"
-              onClick={() => setOpen(false)}
+              className="px-8 py-3 text-xl text-foreground border-foreground border-t border-l border-r-6 border-b-6"
+              onClick={() => {
+                setOpen(false);
+                setError('');
+              }}
             >
               CANCEL
             </Button>
             <Button
               variant="outline"
-              className="px-8 py-3 text-xl text-foreground! border-secondary! border-t border-l border-r-6 border-b-6"
-              onClick={() => setOpen(false)}
+              className="px-8 py-3 text-xl text-foreground border-secondary border-t border-l border-r-6 border-b-6 disabled:opacity-50"
+              onClick={handleSave}
+              disabled={saving}
             >
-              SAVE
+              {saving ? 'SAVING...' : 'SAVE'}
             </Button>
           </div>
         </DialogContent>
