@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
+function looksLikeUrl(text: string): boolean {
+  return /^https?:\/\//.test(text.trim());
+}
+
 export default function CreatePage() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -15,6 +19,15 @@ export default function CreatePage() {
   const router = useRouter();
 
   const openMenu = useCallback(() => setOpen(true), []);
+
+  const openWithPaste = useCallback((pastedText: string) => {
+    const text = pastedText.trim();
+    if (looksLikeUrl(text)) {
+      setLink(text);
+      setCategory('links');
+    }
+    setOpen(true);
+  }, []);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -58,13 +71,21 @@ export default function CreatePage() {
   return (
     <div
       className="fixed inset-0 overflow-hidden"
-      onPaste={openMenu}
+      onPaste={(e) => {
+        const text = e.clipboardData.getData('text');
+        if (text) openWithPaste(text);
+      }}
       onDragOver={(e) => {
         e.preventDefault();
       }}
       onDrop={(e) => {
         e.preventDefault();
-        openMenu();
+        const text = e.dataTransfer.getData('text');
+        if (text && looksLikeUrl(text)) {
+          setLink(text.trim());
+          setCategory('links');
+        }
+        setOpen(true);
       }}
     >
       <div className="flex items-center justify-center h-screen w-screen">
