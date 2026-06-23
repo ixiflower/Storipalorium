@@ -38,6 +38,27 @@ export async function GET(request: Request) {
   } catch (error) { console.error('Failed to fetch items:', error); return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 }); }
 }
 
+export async function PATCH(request: Request) {
+  const { data: session } = await auth.getSession();
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const body = await request.json();
+    const { id, title, link, category, tags } = body;
+    if (!id) return NextResponse.json({ error: 'Item ID required' }, { status: 400 });
+    const item = await db.select().from(items).where(eq(items.id, id)).limit(1);
+    if (!item.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (item[0].userId !== session.user.id) return NextResponse.json({ error: 'Not your item' }, { status: 403 });
+    const updates: Record<string, unknown> = {};
+    if (title !== undefined) updates.title = title;
+    if (link !== undefined) updates.link = link;
+    if (category !== undefined) updates.category = category;
+    if (tags !== undefined) updates.tags = tags;
+    if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    const result = await db.update(items).set(updates).where(eq(items.id, id)).returning();
+    return NextResponse.json({ item: result[0] });
+  } catch (error) { console.error('Failed to update item:', error); return NextResponse.json({ error: 'Failed to update item' }, { status: 500 }); }
+}
+
 export async function DELETE(request: Request) {
   const { data: session } = await auth.getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

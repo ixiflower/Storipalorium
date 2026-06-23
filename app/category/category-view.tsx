@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen, Pencil } from 'lucide-react';
 
 type Item = {
   id: string; title: string; link: string | null; category: string;
@@ -13,6 +13,12 @@ type SortMode = 'newest' | 'oldest' | 'name';
 
 function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [eTitle, setETitle] = useState(item.title);
+  const [eLink, setELink] = useState(item.link || '');
+  const [eCategory, setECategory] = useState(item.category);
+  const [eTags, setETags] = useState(item.tags || '');
+  const [eSaving, setESaving] = useState(false);
   const tagList = item.tags ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   const handleDelete = async () => {
@@ -21,6 +27,42 @@ function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
     if (r.ok) window.location.reload();
     else setDeleting(false);
   };
+
+  const handleEdit = () => { setEditing(true); setETitle(item.title); setELink(item.link || ''); setECategory(item.category); setETags(item.tags || ''); };
+  const handleSave = async () => {
+    if (!eTitle.trim()) return;
+    setESaving(true);
+    const r = await fetch('/api/items', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, title: eTitle.trim(), link: eLink.trim(), category: eCategory, tags: eTags }),
+    });
+    if (r.ok) window.location.reload();
+    else setESaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div style={{ paddingLeft: `${depth * 1.5 + 1}rem` }} className="py-2 px-2">
+        <div className="border-secondary border-t border-l border-r-6 border-b-6 p-4 space-y-3 bg-background">
+          <input value={eTitle} onChange={(e) => setETitle(e.target.value)} placeholder="Title"
+            className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-9" autoFocus />
+          <input value={eLink} onChange={(e) => setELink(e.target.value)} placeholder="Link"
+            className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-9" />
+          <div className="flex gap-2">
+            <input value={eCategory} onChange={(e) => setECategory(e.target.value)} placeholder="Category"
+              className="flex-1 bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-9" />
+            <input value={eTags} onChange={(e) => setETags(e.target.value)} placeholder="Tags"
+              className="flex-1 bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-9" />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs text-foreground/60 hover:text-foreground">Cancel</button>
+            <button onClick={handleSave} disabled={eSaving}
+              className="px-3 py-1.5 text-xs text-foreground border-secondary border-t border-l border-r-6 border-b-6 hover:border-foreground/40">{eSaving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group flex items-start gap-2 py-2 px-2 hover:bg-foreground/[0.03] transition-colors" style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}>
@@ -36,6 +78,9 @@ function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
           </div>
         )}
       </div>
+      <button onClick={handleEdit} className="opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-accent transition-all shrink-0 mt-0.5">
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
       <button onClick={handleDelete} disabled={deleting}
         className="opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-destructive transition-all shrink-0 mt-0.5">
         <Trash2 className="w-3.5 h-3.5" />
@@ -156,7 +201,7 @@ export function CategoryView({
           </p>
         </div>
 
-        <div className="mb-12 relative">
+        <div className="mb-12">
           <div className="flex items-center border-secondary border-t border-l border-r-6 border-b-6 px-4 h-12">
             <Search className="w-4 h-4 text-foreground/30 mr-3 shrink-0" />
             <input value={query} onChange={(e) => setQuery(e.target.value)}
@@ -169,27 +214,23 @@ export function CategoryView({
             )}
           </div>
           {results && (
-            <div className="absolute top-14 left-0 right-0 z-10 bg-background border-secondary border-t border-l border-r-6 border-b-6 max-h-96 overflow-y-auto">
-              <div className="p-2 text-foreground/30 text-xs">{results.length} result{results.length !== 1 ? 's' : ''}</div>
+            <div className="mt-4 border-secondary border-t border-l border-r-6 border-b-6">
+              <div className="p-3 text-foreground/30 text-xs border-b border-secondary/30">
+                {results.length} result{results.length !== 1 ? 's' : ''}
+              </div>
               {results.length === 0 ? (
                 <div className="p-4 text-foreground/40 text-sm">Nothing found</div>
-              ) : results.map(({ item, source }) => (
-                <div key={item.id} className="px-4 py-3 hover:bg-foreground/5 border-t border-secondary/30">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-foreground text-sm">{item.title}</div>
-                      {item.link && <div className="text-accent text-xs truncate max-w-md">{item.link}</div>}
-                      <div className="flex gap-2 mt-1 flex-wrap">
-                        <span className="text-foreground/30 text-xs">{item.category}</span>
-                        {item.tags?.split(',').filter(Boolean).map(t => (
-                          <span key={t} className="text-foreground/20 text-xs">#{t.trim()}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-foreground/20 text-xs shrink-0">{source}</span>
-                  </div>
+              ) : (
+                <div>
+                  {(() => {
+                    const grouped: Record<string, { item: Item; source: string }[]> = {};
+                    for (const r of results) (grouped[r.source] ||= []).push(r);
+                    return Object.entries(grouped).map(([src, items]) => (
+                      <SectionNode key={src} title={src} items={items.map(x => x.item)} depth={0} defaultOpen={true} />
+                    ));
+                  })()}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
