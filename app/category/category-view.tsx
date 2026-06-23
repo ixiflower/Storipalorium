@@ -214,14 +214,14 @@ export function CategoryView({
             )}
           </div>
           {results && (
-            <div className="mt-4 border-secondary border-t border-l border-r-6 border-b-6">
-              <div className="p-3 text-foreground/30 text-xs border-b border-secondary/30">
+            <div className="mt-4">
+              <div className="text-foreground/30 text-xs mb-4">
                 {results.length} result{results.length !== 1 ? 's' : ''}
               </div>
               {results.length === 0 ? (
-                <div className="p-4 text-foreground/40 text-sm">Nothing found</div>
+                <div className="text-foreground/40 text-sm">Nothing found</div>
               ) : (
-                <div>
+                <div className="border-l border-foreground/10 pl-2 space-y-6">
                   {(() => {
                     const grouped: Record<string, { item: Item; source: string }[]> = {};
                     for (const r of results) (grouped[r.source] ||= []).push(r);
