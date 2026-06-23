@@ -3,12 +3,12 @@
 </div>
 
 <p align="center">
-  A contemplative, minimal bookmark and snippet storage app — somewhere to save something for someday.
+  A contemplative, minimal homepage for saving quotes and snippets — somewhere to keep something for someday.
 </p>
 
 ## About
 
-A place to keep quotes, links, notes, and media. Built with Next.js and a dark, monospace aesthetic.
+A dark, monospace Next.js app that displays daily wisdom quotes and provides an interface for organizing links, notes, and media.
 
 <div align="center">
 
@@ -25,7 +25,7 @@ A place to keep quotes, links, notes, and media. Built with Next.js and a dark, 
 <div align="center">
 
 - **Daily Wisdom Quotes** — Fetches random wisdom quotes from API-Ninjas with a 20-second cooldown refresh
-- **Create Items** — Add bookmarks, notes, or media via Ctrl+V or drag-and-drop with title, link, and category
+- **Create Items Interface** — UI for adding bookmarks, notes, or media via Ctrl+V or drag-and-drop (save UI in place, backend pending)
 - **Slide-in Navigation** — Full-screen menu with hover effects and route labels
 - **Fingerprint Login** — Simulated biometric authentication with pulse animation
 - **Dark Theme** — Always-dark mode with a custom OKLCH color palette
