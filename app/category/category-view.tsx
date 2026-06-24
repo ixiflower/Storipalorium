@@ -296,15 +296,15 @@ export function CategoryView({
           </div>
           {/* Tag filter chips */}
           {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
               {allTags.map(tag => {
                 const active = selectedTags.has(tag);
                 return (
                   <button key={tag} onClick={() => toggleTag(tag)}
-                    className={`px-2.5 py-1 text-xs transition-colors border-t border-l border-r-6 border-b-6 ${
+                    className={`text-xs transition-colors cursor-pointer ${
                       active
-                        ? 'border-accent/60 text-accent bg-accent/[0.05]'
-                        : 'border-secondary text-foreground/30 hover:text-foreground/60 hover:border-foreground/20'
+                        ? 'text-accent'
+                        : 'text-foreground/30 hover:text-foreground/60'
                     }`}
                   >
                     {tag}
@@ -313,8 +313,8 @@ export function CategoryView({
               })}
               {selectedTags.size > 0 && (
                 <button onClick={() => setSelectedTags(new Set())}
-                  className="px-2 py-1 text-xs text-foreground/30 hover:text-destructive transition-colors">
-                  <X className="w-3 h-3 inline mr-0.5" />clear
+                  className="text-xs text-foreground/20 hover:text-destructive transition-colors">
+                  clear
                 </button>
               )}
             </div>
