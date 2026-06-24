@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Users, Trash2, Copy, Check } from 'lucide-react';
@@ -132,6 +133,7 @@ export default function CreatePage() {
             <button type="button" onClick={() => setShowRoomPanel(!showRoomPanel)} className="flex items-center gap-1 text-accent text-sm hover:underline">
               <Users className="w-4 h-4" />{showRoomPanel ? 'Hide rooms' : 'Manage rooms'}</button>
             {selectedRoom && <span className="text-foreground/40 text-sm">→ {selectedRoom.name}</span>}
+            <Link href="/rooms" className="text-foreground/40 text-xs hover:text-accent ml-auto">All rooms →</Link>
           </div>
 
           {showRoomPanel && (

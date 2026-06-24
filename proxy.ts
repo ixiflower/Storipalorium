@@ -8,5 +8,6 @@ export const config = {
   matcher: [
     '/create/:path*',
     '/category/:path*',
+    '/rooms/:path*',
   ],
 };

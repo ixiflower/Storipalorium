@@ -1,75 +1,129 @@
 import { auth } from '@/lib/auth/server';
 import { db } from '@/lib/db';
-import { items, roomMembers, type NewItem } from '@/lib/db-schema';
+import { items, rooms, roomMembers, type NewItem, parseRoomSettings } from '@/lib/db-schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
+function error(msg: string, status: number) {
+  return NextResponse.json({ error: msg }, { status });
+}
+
 export async function POST(request: Request) {
   const { data: session } = await auth.getSession();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session?.user) return error('Unauthorized', 401);
   try {
     const body = await request.json();
     const { title, link, category, roomId, tags } = body;
-    if (!title || !category) return NextResponse.json({ error: 'Title and category are required' }, { status: 400 });
+    if (!title || !category) return error('Title and category are required', 400);
+
     if (roomId) {
       const member = await db.select().from(roomMembers).where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, session.user.id))).limit(1);
-      if (!member.length) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
+      if (!member.length) return error('Not a member', 403);
+
+      // Check room settings: whoCanAdd
+      const room = await db.select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+      if (room.length) {
+        const settings = parseRoomSettings(room[0].settings);
+        if (settings.whoCanAdd === 'owner' && room[0].ownerId !== session.user.id) {
+          return error('Only the room owner can add items', 403);
+        }
+      }
     }
+
     const newItem: NewItem = { userId: session.user.id, title, link: link || '', category, roomId: roomId || null, tags: tags || '' };
     const result = await db.insert(items).values(newItem).returning();
     return NextResponse.json({ item: result[0] }, { status: 201 });
-  } catch (error) { console.error('Failed to create item:', error); return NextResponse.json({ error: 'Failed to create item' }, { status: 500 }); }
+  } catch (e) { console.error('Failed to create item:', e); return error('Failed to create item', 500); }
 }
 
 export async function GET(request: Request) {
   const { data: session } = await auth.getSession();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session?.user) return error('Unauthorized', 401);
   try {
     const { searchParams } = new URL(request.url);
     const roomId = searchParams.get('roomId');
     if (roomId) {
       const member = await db.select().from(roomMembers).where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, session.user.id))).limit(1);
-      if (!member.length) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
+      if (!member.length) return error('Not a member', 403);
       const roomItems = await db.select().from(items).where(eq(items.roomId, roomId)).orderBy(items.createdAt);
       return NextResponse.json({ items: roomItems });
     }
     const userItems = await db.select().from(items).where(and(eq(items.userId, session.user.id), isNull(items.roomId))).orderBy(items.createdAt);
     return NextResponse.json({ items: userItems });
-  } catch (error) { console.error('Failed to fetch items:', error); return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 }); }
+  } catch (e) { console.error('Failed to fetch items:', e); return error('Failed to fetch items', 500); }
 }
 
 export async function PATCH(request: Request) {
   const { data: session } = await auth.getSession();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session?.user) return error('Unauthorized', 401);
   try {
     const body = await request.json();
     const { id, title, link, category, tags } = body;
-    if (!id) return NextResponse.json({ error: 'Item ID required' }, { status: 400 });
+    if (!id) return error('Item ID required', 400);
     const item = await db.select().from(items).where(eq(items.id, id)).limit(1);
-    if (!item.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if (item[0].userId !== session.user.id) return NextResponse.json({ error: 'Not your item' }, { status: 403 });
+    if (!item.length) return error('Not found', 404);
+
+    const target = item[0];
+
+    // Check ownership or room permissions
+    if (target.userId !== session.user.id) {
+      if (target.roomId) {
+        // In a room: check room edit permissions
+        const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
+        if (room.length) {
+          const settings = parseRoomSettings(room[0].settings);
+          if (settings.whoCanEdit === 'owner' && room[0].ownerId !== session.user.id) {
+            return error('Only the room owner can edit items', 403);
+          }
+          // 'anyone' — allowed; 'own' — current user isn't owner, blocked
+          if (settings.whoCanEdit === 'own') return error('You can only edit your own items', 403);
+          // 'anyone' — fall through to allow
+        }
+      } else {
+        return error('Not your item', 403);
+      }
+    }
+
     const updates: Record<string, unknown> = {};
     if (title !== undefined) updates.title = title;
     if (link !== undefined) updates.link = link;
     if (category !== undefined) updates.category = category;
     if (tags !== undefined) updates.tags = tags;
-    if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    if (Object.keys(updates).length === 0) return error('No fields to update', 400);
     const result = await db.update(items).set(updates).where(eq(items.id, id)).returning();
     return NextResponse.json({ item: result[0] });
-  } catch (error) { console.error('Failed to update item:', error); return NextResponse.json({ error: 'Failed to update item' }, { status: 500 }); }
+  } catch (e) { console.error('Failed to update item:', e); return error('Failed to update item', 500); }
 }
 
 export async function DELETE(request: Request) {
   const { data: session } = await auth.getSession();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session?.user) return error('Unauthorized', 401);
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Item ID required' }, { status: 400 });
+    if (!id) return error('Item ID required', 400);
     const item = await db.select().from(items).where(eq(items.id, id)).limit(1);
-    if (!item.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if (item[0].userId !== session.user.id) return NextResponse.json({ error: 'Not your item' }, { status: 403 });
+    if (!item.length) return error('Not found', 404);
+
+    const target = item[0];
+
+    // Check ownership or room permissions
+    if (target.userId !== session.user.id) {
+      if (target.roomId) {
+        const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
+        if (room.length) {
+          const settings = parseRoomSettings(room[0].settings);
+          if (settings.whoCanDelete === 'owner' && room[0].ownerId !== session.user.id) {
+            return error('Only the room owner can delete items', 403);
+          }
+          if (settings.whoCanDelete === 'own') return error('You can only delete your own items', 403);
+        }
+      } else {
+        return error('Not your item', 403);
+      }
+    }
+
     await db.delete(items).where(eq(items.id, id));
     return NextResponse.json({ success: true });
-  } catch (error) { console.error('Failed to delete item:', error); return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 }); }
+  } catch (e) { console.error('Failed to delete item:', e); return error('Failed to delete item', 500); }
 }

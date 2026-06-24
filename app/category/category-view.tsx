@@ -11,9 +11,13 @@ type Item = {
 type Room = { id: string; name: string; code: string };
 type SortMode = 'newest' | 'oldest' | 'name';
 
-function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
+function ItemLeaf({ item, depth, editingId, onEditingChange }: {
+  item: Item; depth: number;
+  editingId: string | null;
+  onEditingChange: (id: string | null) => void;
+}) {
   const [deleting, setDeleting] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const isEditing = editingId === item.id;
   const [eTitle, setETitle] = useState(item.title);
   const [eLink, setELink] = useState(item.link || '');
   const [eCategory, setECategory] = useState(item.category);
@@ -28,7 +32,11 @@ function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
     else setDeleting(false);
   };
 
-  const handleEdit = () => { setEditing(true); setETitle(item.title); setELink(item.link || ''); setECategory(item.category); setETags(item.tags || ''); };
+  const handleEdit = () => {
+    setETitle(item.title); setELink(item.link || ''); setECategory(item.category); setETags(item.tags || '');
+    onEditingChange(item.id);
+  };
+
   const handleSave = async () => {
     if (!eTitle.trim()) return;
     setESaving(true);
@@ -40,7 +48,7 @@ function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
     else setESaving(false);
   };
 
-  if (editing) {
+  if (isEditing) {
     return (
       <div style={{ paddingLeft: `${depth * 1.5 + 1}rem` }} className="py-2 px-2">
         <div className="border-secondary border-t border-l border-r-6 border-b-6 p-4 space-y-3 bg-background">
@@ -55,7 +63,7 @@ function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
               className="flex-1 bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-9" />
           </div>
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs text-foreground/60 hover:text-foreground">Cancel</button>
+            <button onClick={() => onEditingChange(null)} className="px-3 py-1.5 text-xs text-foreground/60 hover:text-foreground">Cancel</button>
             <button onClick={handleSave} disabled={eSaving}
               className="px-3 py-1.5 text-xs text-foreground border-secondary border-t border-l border-r-6 border-b-6 hover:border-foreground/40">{eSaving ? 'Saving...' : 'Save'}</button>
           </div>
@@ -78,18 +86,22 @@ function ItemLeaf({ item, depth }: { item: Item; depth: number }) {
           </div>
         )}
       </div>
-      <button onClick={handleEdit} className="opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-accent transition-all shrink-0 mt-0.5">
+      <button onClick={handleEdit} className="text-foreground/20 hover:text-accent transition-all shrink-0 mt-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
         <Pencil className="w-3.5 h-3.5" />
       </button>
       <button onClick={handleDelete} disabled={deleting}
-        className="opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-destructive transition-all shrink-0 mt-0.5">
+        className="text-foreground/20 hover:text-destructive transition-all shrink-0 mt-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
   );
 }
 
-function CategoryNode({ name, items, depth }: { name: string; items: Item[]; depth: number }) {
+function CategoryNode({ name, items, depth, editingId, onEditingChange }: {
+  name: string; items: Item[]; depth: number;
+  editingId: string | null;
+  onEditingChange: (id: string | null) => void;
+}) {
   const [open, setOpen] = useState(true);
   const indent = depth * 1.5;
 
@@ -105,14 +117,20 @@ function CategoryNode({ name, items, depth }: { name: string; items: Item[]; dep
       </button>
       {open && (
         <div>
-          {items.map(item => <ItemLeaf key={item.id} item={item} depth={depth + 1} />)}
+          {items.map(item => (
+            <ItemLeaf key={item.id} item={item} depth={depth + 1} editingId={editingId} onEditingChange={onEditingChange} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function SectionNode({ title, items, depth, defaultOpen }: { title: string; items: Item[]; depth: number; defaultOpen: boolean }) {
+function SectionNode({ title, items, depth, defaultOpen, editingId, onEditingChange }: {
+  title: string; items: Item[]; depth: number; defaultOpen: boolean;
+  editingId: string | null;
+  onEditingChange: (id: string | null) => void;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const [sort, setSort] = useState<SortMode>('newest');
 
@@ -151,7 +169,7 @@ function SectionNode({ title, items, depth, defaultOpen }: { title: string; item
       {open && (
         <div>
           {Object.entries(grouped).map(([cat, catItems]) => (
-            <CategoryNode key={cat} name={cat} items={catItems} depth={depth + 1} />
+            <CategoryNode key={cat} name={cat} items={catItems} depth={depth + 1} editingId={editingId} onEditingChange={onEditingChange} />
           ))}
         </div>
       )}
@@ -167,6 +185,7 @@ export function CategoryView({
   roomItemsMap: Record<string, Item[]>;
 }) {
   const [query, setQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const totalItems = privateItems.length + Object.values(roomItemsMap).reduce((s, a) => s + a.length, 0);
 
   const allItems = useMemo(() => {
@@ -226,7 +245,7 @@ export function CategoryView({
                     const grouped: Record<string, { item: Item; source: string }[]> = {};
                     for (const r of results) (grouped[r.source] ||= []).push(r);
                     return Object.entries(grouped).map(([src, items]) => (
-                      <SectionNode key={src} title={src} items={items.map(x => x.item)} depth={0} defaultOpen={true} />
+                      <SectionNode key={src} title={src} items={items.map(x => x.item)} depth={0} defaultOpen={true} editingId={editingId} onEditingChange={setEditingId} />
                     ));
                   })()}
                 </div>
@@ -245,12 +264,12 @@ export function CategoryView({
         ) : (
           <div className="space-y-6 border-l border-foreground/10 pl-2">
             {privateItems.length > 0 && (
-              <SectionNode title="Private" items={privateItems} depth={0} defaultOpen={true} />
+              <SectionNode title="Private" items={privateItems} depth={0} defaultOpen={true} editingId={editingId} onEditingChange={setEditingId} />
             )}
             {userRooms.map(room => {
               const ri = roomItemsMap[room.id] || [];
               if (ri.length === 0) return null;
-              return <SectionNode key={room.id} title={room.name} items={ri} depth={0} defaultOpen={ri.length > 0} />;
+              return <SectionNode key={room.id} title={room.name} items={ri} depth={0} defaultOpen={ri.length > 0} editingId={editingId} onEditingChange={setEditingId} />;
             })}
           </div>
         )}

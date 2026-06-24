@@ -9,6 +9,7 @@ import { authClient } from '@/lib/auth/client';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const segment = pathname.split('/')[1] || '';
@@ -72,18 +73,42 @@ export function Navbar() {
               <Image src="/hovered.svg" alt="" width={24} height={24} className="w-6 h-6 mr-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <span className="ml-0 group-hover:translate-x-8 transition-transform duration-300">CATEGORIES</span>
             </Link>
+            <Link href="/rooms" onClick={() => setIsOpen(false)} className="text-5xl md:text-7xl hover:opacity-75 transition-all duration-300 ease-in-out relative flex items-center group">
+              <Image src="/hovered.svg" alt="" width={24} height={24} className="w-6 h-6 mr-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="ml-0 group-hover:translate-x-8 transition-transform duration-300">ROOMS</span>
+            </Link>
             <Link href="/api" onClick={() => setIsOpen(false)} className="text-5xl md:text-7xl hover:opacity-75 transition-all duration-300 ease-in-out relative flex items-center group">
               <Image src="/hovered.svg" alt="" width={24} height={24} className="w-6 h-6 mr-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <span className="ml-0 group-hover:translate-x-8 transition-transform duration-300">API</span>
             </Link>
             {session?.user ? (
-              <button onClick={handleSignOut} className="text-5xl md:text-7xl hover:opacity-75 transition-all duration-300 ease-in-out relative flex items-center group text-left">
-                <Image src="/hovered.svg" alt="" width={24} height={24} className="w-6 h-6 mr-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="ml-0 group-hover:translate-x-8 transition-transform duration-300 flex items-center gap-2">
-                  LOGOUT
-                  <LogOut className="w-6 h-6" />
-                </span>
-              </button>
+              showLogoutConfirm ? (
+                <div className="space-y-6">
+                  <div className="text-3xl md:text-4xl text-foreground">Are you sure?</div>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className="px-6 py-3 text-xl text-foreground border-foreground border-t border-l border-r-6 border-b-6 hover:opacity-75 transition-opacity"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      onClick={handleSignOut}
+                      className="px-6 py-3 text-xl text-destructive border-destructive border-t border-l border-r-6 border-b-6 hover:opacity-75 transition-opacity flex items-center gap-2"
+                    >
+                      LOGOUT <LogOut className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setShowLogoutConfirm(true)} className="text-5xl md:text-7xl hover:opacity-75 transition-all duration-300 ease-in-out relative flex items-center group text-left">
+                  <Image src="/hovered.svg" alt="" width={24} height={24} className="w-6 h-6 mr-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="ml-0 group-hover:translate-x-8 transition-transform duration-300 flex items-center gap-2">
+                    LOGOUT
+                    <LogOut className="w-6 h-6" />
+                  </span>
+                </button>
+              )
             ) : (
               <Link href="/login" onClick={() => setIsOpen(false)} className="text-5xl md:text-7xl hover:opacity-75 transition-all duration-300 ease-in-out relative flex items-center group">
                 <Image src="/hovered.svg" alt="" width={24} height={24} className="w-6 h-6 mr-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

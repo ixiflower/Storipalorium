@@ -6,8 +6,19 @@ export const rooms = pgTable('rooms', {
   name: text('name').notNull(),
   code: text('code').notNull().unique(),
   ownerId: text('owner_id').notNull(),
+  settings: text('settings').default('{}'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+export type RoomSettings = {
+  whoCanAdd: 'anyone' | 'owner';
+  whoCanDelete: 'anyone' | 'owner' | 'own';
+  whoCanEdit: 'anyone' | 'owner' | 'own';
+};
+
+export function defaultRoomSettings(): RoomSettings {
+  return { whoCanAdd: 'anyone', whoCanDelete: 'own', whoCanEdit: 'anyone' };
+}
 
 export const roomMembers = pgTable(
   'room_members',
@@ -53,3 +64,16 @@ export type NewRoom = typeof rooms.$inferInsert;
 export type RoomMember = typeof roomMembers.$inferSelect;
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
+
+// Helper: parse room settings with defaults
+export function parseRoomSettings(raw: string | null | undefined): RoomSettings {
+  try {
+    const parsed = raw ? JSON.parse(raw) : {};
+    const defs = defaultRoomSettings();
+    return {
+      whoCanAdd: parsed.whoCanAdd || defs.whoCanAdd,
+      whoCanDelete: parsed.whoCanDelete || defs.whoCanDelete,
+      whoCanEdit: parsed.whoCanEdit || defs.whoCanEdit,
+    };
+  } catch { return defaultRoomSettings(); }
+}
