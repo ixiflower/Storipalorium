@@ -33,6 +33,10 @@ const docSections: DocSection[] = [
       { id: 'rooms-list', method: 'GET', path: '/api/v1/rooms', label: 'List rooms' },
       { id: 'rooms-create', method: 'POST', path: '/api/v1/rooms', label: 'Create room' },
       { id: 'rooms-join', method: 'POST', path: '/api/v1/rooms', label: 'Join room' },
+      { id: 'rooms-settings', method: 'PATCH', path: '/api/v1/rooms', label: 'Update settings' },
+      { id: 'rooms-code', method: 'PATCH', path: '/api/v1/rooms', label: 'Regenerate code' },
+      { id: 'rooms-members', method: 'GET', path: '/api/v1/rooms/members', label: 'List members' },
+      { id: 'rooms-kick', method: 'DELETE', path: '/api/v1/rooms/members', label: 'Kick member' },
       { id: 'rooms-delete', method: 'DELETE', path: '/api/v1/rooms?id=...', label: 'Delete room' },
     ],
   },
@@ -88,8 +92,7 @@ export function APIDocs({ userId, tokens: initialTokens }: { userId: string; tok
     <div className="min-h-screen pt-20 px-4 md:px-8 pb-20">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl text-foreground mb-2">API</h1>
-          <p className="text-foreground/50">Programmatic access to your Storipalorium data.</p>
+          <p className="text-foreground/50 text-lg">Programmatic access to your Storipalorium data.</p>
         </div>
 
         <div className="flex gap-8 flex-col md:flex-row">
@@ -351,7 +354,57 @@ function DocContent({ active }: { active: string }) {
           {m('DELETE', '/api/v1/rooms?id=ROOM_ID')}
           <p className="text-foreground/60 text-sm">Delete a room. Only the room owner can do this.</p>
           <div className="text-foreground/60 text-sm font-medium mt-4">Example</div>
-          {code(`curl -X DELETE \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  "https://storipalorium.vercel.app/api/v1/rooms?id=xxx"`)}
+          {code(`curl -X DELETE \\\n  -H "Authorization: Bearer *** \\\n  "https://storipalorium.vercel.app/api/v1/rooms?id=xxx"`)}
+        </div>
+      );
+
+    case 'rooms-settings':
+      return (
+        <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+          <h2 className="text-2xl text-foreground">Update Room Settings</h2>
+          {m('PATCH', '/api/v1/rooms')}
+          <p className="text-foreground/60 text-sm">Update room permissions. Only the room owner can change settings.</p>
+          <div className="text-foreground/60 text-sm font-medium mt-4">Body (JSON)</div>
+          {code(`{\n  "id": "room-uuid",\n  "settings": {\n    "whoCanAdd": "anyone" | "owner",\n    "whoCanDelete": "anyone" | "own" | "owner",\n    "whoCanEdit": "anyone" | "own" | "owner"\n  }\n}`)}
+          <div className="text-foreground/60 text-sm font-medium mt-4">Example</div>
+          {code(`curl -X PATCH \\\n  -H "Authorization: Bearer *** \\\n  -H "Content-Type: application/json" \\\n  -d '{"id":"xxx","settings":{"whoCanAdd":"owner"}}' \\\n  https://storipalorium.vercel.app/api/v1/rooms`)}
+        </div>
+      );
+
+    case 'rooms-code':
+      return (
+        <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+          <h2 className="text-2xl text-foreground">Regenerate Invite Code</h2>
+          {m('PATCH', '/api/v1/rooms')}
+          <p className="text-foreground/60 text-sm">Generate a new invite code. The old code stops working immediately. Owner only.</p>
+          <div className="text-foreground/60 text-sm font-medium mt-4">Body (JSON)</div>
+          {code(`{\n  "id": "room-uuid",\n  "action": "regenerate-code"\n}`)}
+          <div className="text-foreground/60 text-sm font-medium mt-4">Example</div>
+          {code(`curl -X PATCH \\\n  -H "Authorization: Bearer *** \\\n  -H "Content-Type: application/json" \\\n  -d '{"id":"xxx","action":"regenerate-code"}' \\\n  https://storipalorium.vercel.app/api/v1/rooms`)}
+        </div>
+      );
+
+    case 'rooms-members':
+      return (
+        <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+          <h2 className="text-2xl text-foreground">List Room Members</h2>
+          {m('GET', '/api/v1/rooms/members?roomId=ROOM_ID')}
+          <p className="text-foreground/60 text-sm">List all members in a room. Only the room owner can view members.</p>
+          <div className="text-foreground/60 text-sm font-medium mt-4">Example</div>
+          {code(`curl -H "Authorization: Bearer *** \\\n  "https://storipalorium.vercel.app/api/v1/rooms/members?roomId=xxx"`)}
+          <div className="text-foreground/60 text-sm font-medium mt-4">Response</div>
+          {code(`{\n  "members": [\n    {\n      "id": "uuid",\n      "userId": "uuid",\n      "roomId": "uuid",\n      "name": "username",\n      "joinedAt": "2026-06-24T..."\n    }\n  ]\n}`)}
+        </div>
+      );
+
+    case 'rooms-kick':
+      return (
+        <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+          <h2 className="text-2xl text-foreground">Kick Member</h2>
+          {m('DELETE', '/api/v1/rooms/members?id=MEMBER_ID')}
+          <p className="text-foreground/60 text-sm">Remove a member from the room. Owner only. Cannot kick yourself.</p>
+          <div className="text-foreground/60 text-sm font-medium mt-4">Example</div>
+          {code(`curl -X DELETE \\\n  -H "Authorization: Bearer *** \\\n  "https://storipalorium.vercel.app/api/v1/rooms/members?id=xxx"`)}
         </div>
       );
 

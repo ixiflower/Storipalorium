@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { items, rooms, roomMembers } from '@/lib/db-schema';
+import { items, rooms, roomMembers, parseRoomSettings } from '@/lib/db-schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { validateBearerToken } from '@/lib/api-auth';
@@ -29,6 +29,11 @@ export async function POST(request: Request) {
   if (roomId) {
     const member = await db.select().from(roomMembers).where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, userId))).limit(1);
     if (!member.length) return err('Not a member of this room', 403);
+    const room = await db.select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+    if (room.length) {
+      const s = parseRoomSettings(room[0].settings);
+      if (s.whoCanAdd === 'owner' && room[0].ownerId !== userId) return err('Only owner can add items', 403);
+    }
   }
   const result = await db.insert(items).values({
     userId, title, link: link || '', category: category || 'links', roomId: roomId || null, tags: tags || '',
@@ -42,7 +47,20 @@ export async function PATCH(request: Request) {
   const { id, title, link, category, tags } = await request.json();
   if (!id) return err('Item ID required', 400);
   const item = await db.select().from(items).where(eq(items.id, id)).limit(1);
-  if (!item.length || item[0].userId !== userId) return err('Not found', 404);
+  if (!item.length) return err('Not found', 404);
+  const target = item[0];
+
+  if (target.userId !== userId) {
+    if (target.roomId) {
+      const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
+      if (room.length) {
+        const s = parseRoomSettings(room[0].settings);
+        if (s.whoCanEdit === 'owner' && room[0].ownerId !== userId) return err('Only owner can edit', 403);
+        if (s.whoCanEdit === 'own') return err('Can only edit own items', 403);
+      }
+    } else return err('Not your item', 403);
+  }
+
   const updates: Record<string, unknown> = {};
   if (title !== undefined) updates.title = title;
   if (link !== undefined) updates.link = link;
@@ -59,7 +77,20 @@ export async function DELETE(request: Request) {
   const id = searchParams.get('id');
   if (!id) return err('Item ID required', 400);
   const item = await db.select().from(items).where(eq(items.id, id)).limit(1);
-  if (!item.length || item[0].userId !== userId) return err('Not found', 404);
+  if (!item.length) return err('Not found', 404);
+  const target = item[0];
+
+  if (target.userId !== userId) {
+    if (target.roomId) {
+      const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
+      if (room.length) {
+        const s = parseRoomSettings(room[0].settings);
+        if (s.whoCanDelete === 'owner' && room[0].ownerId !== userId) return err('Only owner can delete', 403);
+        if (s.whoCanDelete === 'own') return err('Can only delete own items', 403);
+      }
+    } else return err('Not your item', 403);
+  }
+
   await db.delete(items).where(eq(items.id, id));
   return NextResponse.json({ success: true });
 }

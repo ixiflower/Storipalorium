@@ -54,3 +54,24 @@ export async function DELETE(request: Request) {
   await db.delete(rooms).where(eq(rooms.id, id));
   return NextResponse.json({ success: true });
 }
+
+export async function PATCH(request: Request) {
+  const userId = await validateBearerToken(request);
+  if (!userId) return err('Invalid or missing API token', 401);
+  const body = await request.json();
+  const { id, settings, action } = body;
+  if (!id) return err('Room ID required', 400);
+  const room = await db.select().from(rooms).where(eq(rooms.id, id)).limit(1);
+  if (!room.length || room[0].ownerId !== userId) return err('Not found or not owner', 404);
+
+  if (action === 'regenerate-code') {
+    const newCode = randomBytes(4).toString('hex').toUpperCase();
+    const updated = await db.update(rooms).set({ code: newCode }).where(eq(rooms.id, id)).returning();
+    return NextResponse.json({ room: updated[0] });
+  }
+  if (settings) {
+    const updated = await db.update(rooms).set({ settings: JSON.stringify(settings) }).where(eq(rooms.id, id)).returning();
+    return NextResponse.json({ room: updated[0] });
+  }
+  return err('Specify settings or action', 400);
+}
