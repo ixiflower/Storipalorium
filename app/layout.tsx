@@ -11,7 +11,12 @@ const redditMono = Reddit_Mono({
 
 export const metadata: Metadata = {
   title: "Storipalorium",
-  description: "A contemplative, minimal homepage",
+  description: "A contemplative, minimal homepage — somewhere to keep something for someday.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
