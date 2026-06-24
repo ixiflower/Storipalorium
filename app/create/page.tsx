@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Trash2, Copy, Check } from 'lucide-react';
+import { Plus, Users, Trash2, Copy, Check, Upload, FileText } from 'lucide-react';
 
 function looksLikeUrl(text: string): boolean { return /^https?:\/\//.test(text.trim()); }
 function getCookie(name: string): string | null {
@@ -18,7 +18,43 @@ function setCookie(name: string, value: string, days = 365) {
 }
 
 type Room = { id: string; name: string; code: string; ownerId: string };
+type BookmarkEntry = { title: string; url: string; tags: string; description: string; selected: boolean };
 const defaultCategories = ['notes', 'links', 'media'];
+
+function parseBookmarks(html: string): BookmarkEntry[] {
+  const entries: BookmarkEntry[] = [];
+  const linkRegex = /<A\s+HREF="([^"]*)"[^>]*?(?:TAGS="([^"]*)")?[^>]*>([^<]*)<\/A>/gi;
+  const descRegex = /<DD>([^<]*)<\/DD>/gi;
+
+  // Collect all links and descriptions
+  const links: { href: string; tags: string; title: string; pos: number }[] = [];
+  const descs: { desc: string; pos: number }[] = [];
+  let m;
+  while ((m = linkRegex.exec(html)) !== null) {
+    links.push({ href: m[1], tags: m[2] || '', title: m[3], pos: m.index });
+  }
+  descRegex.lastIndex = 0;
+  while ((m = descRegex.exec(html)) !== null) {
+    descs.push({ desc: m[1], pos: m.index });
+  }
+
+  for (const link of links) {
+    // Find closest description AFTER this link
+    let desc = '';
+    for (const d of descs) {
+      if (d.pos > link.pos) { desc = d.desc; break; }
+    }
+    entries.push({
+      title: link.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)),
+      url: link.href,
+      tags: link.tags,
+      description: desc.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;/g, "'"),
+      selected: true,
+    });
+  }
+
+  return entries;
+}
 
 export default function CreatePage() {
   const [open, setOpen] = useState(false);
@@ -40,6 +76,14 @@ export default function CreatePage() {
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const router = useRouter();
+
+  // Bookmark import state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bookmarks, setBookmarks] = useState<BookmarkEntry[]>([]);
+  const [importRoom, setImportRoom] = useState('private');
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+  const [importProgress, setImportProgress] = useState('');
 
   useEffect(() => {
     fetch('/api/rooms').then(r => r.json()).then(d => { if (d.rooms) setRooms(d.rooms); }).catch(() => {});
@@ -92,9 +136,59 @@ export default function CreatePage() {
     else { const d = await res.json(); setRoomMsg(d.error || 'Failed'); }
   };
 
+  // Bookmark import handlers
+  const handleFilePick = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const html = reader.result as string;
+      const entries = parseBookmarks(html);
+      setBookmarks(entries);
+      setImportRoom(selectedRoomId);
+      setImportMsg('');
+      setImportProgress('');
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-picked
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const toggleBookmark = (idx: number) => {
+    setBookmarks(p => p.map((b, i) => i === idx ? { ...b, selected: !b.selected } : b));
+  };
+
+  const toggleAll = () => {
+    const allSelected = bookmarks.every(b => b.selected);
+    setBookmarks(p => p.map(b => ({ ...b, selected: !allSelected })));
+  };
+
+  const importBookmarks = async () => {
+    const toImport = bookmarks.filter(b => b.selected);
+    if (!toImport.length) { setImportMsg('No bookmarks selected.'); return; }
+    setImporting(true); setImportMsg(''); setImportProgress('');
+    let ok = 0; let fail = 0;
+    for (let i = 0; i < toImport.length; i++) {
+      const b = toImport[i];
+      setImportProgress(`Importing ${i + 1}/${toImport.length}...`);
+      try {
+        const body: Record<string, string> = { title: b.title, link: b.url, category: 'links', tags: b.tags };
+        if (importRoom !== 'private') body.roomId = importRoom;
+        const res = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
+    }
+    setImportMsg(`Done: ${ok} imported, ${fail} failed.`);
+    setImportProgress('');
+    setImporting(false);
+    if (ok > 0) { setBookmarks([]); router.refresh(); }
+  };
+
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
   const ic = "bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10";
-  const bc = "px-3 py-2 text-sm text-foreground border-secondary border-t border-l border-r-6 border-b-6 h-10 inline-flex items-center gap-1 shrink-0";
+  const bc = "px-3 py-2 text-sm text-foreground border-secondary border-t border-l border-r-6 border-b-6 h-10 inline-flex items-center gap-1 shrink-0 hover:border-foreground/40 transition-colors disabled:opacity-30";
 
   return (
     <div className="fixed inset-0 overflow-hidden"
@@ -123,6 +217,7 @@ export default function CreatePage() {
         <DialogContent className="sm:max-w-3xl md:max-w-5xl p-8 border-secondary border-t border-l border-r-6 border-b-6 max-h-[90vh] overflow-y-auto">
           <DialogTitle className="sr-only">Add Item</DialogTitle>
 
+          {/* Save target + Import button */}
           <div className="mb-8 flex items-center gap-4 flex-wrap">
             <span className="text-foreground text-lg">Save to:</span>
             <select value={selectedRoomId} onChange={(e) => setSelectedRoomId(e.target.value)}
@@ -134,8 +229,70 @@ export default function CreatePage() {
               <Users className="w-4 h-4" />{showRoomPanel ? 'Hide rooms' : 'Manage rooms'}</button>
             {selectedRoom && <span className="text-foreground/40 text-sm">→ {selectedRoom.name}</span>}
             <Link href="/rooms" className="text-foreground/40 text-xs hover:text-accent ml-auto">All rooms →</Link>
+            {/* Import Bookmarks button */}
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".html,.htm" className="hidden" />
+            <button type="button" onClick={handleFilePick} className={bc}>
+              <Upload className="w-4 h-4" /> Import Bookmarks
+            </button>
           </div>
 
+          {/* Bookmark import preview */}
+          {bookmarks.length > 0 && (
+            <div className="mb-8 p-4 border-secondary border-t border-l border-r-6 border-b-6 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="text-foreground text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-accent" />
+                  {bookmarks.length} bookmarks found
+                </div>
+                <button onClick={() => setBookmarks([])} className="text-foreground/40 text-sm hover:text-foreground transition-colors">Clear</button>
+              </div>
+
+              {/* Import target */}
+              <div className="flex items-center gap-3">
+                <span className="text-foreground/60 text-sm">Import to:</span>
+                <select value={importRoom} onChange={(e) => setImportRoom(e.target.value)}
+                  className="bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10">
+                  <option className="bg-background" value="private">Private</option>
+                  {rooms.map(r => <option key={r.id} className="bg-background" value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+
+              {/* Select all */}
+              <label className="flex items-center gap-2 text-foreground/60 text-sm cursor-pointer hover:text-foreground transition-colors">
+                <input type="checkbox" checked={bookmarks.every(b => b.selected)} onChange={toggleAll}
+                  className="accent-accent" />
+                {bookmarks.every(b => b.selected) ? 'Deselect all' : 'Select all'}
+              </label>
+
+              {/* Bookmark list */}
+              <div className="max-h-64 overflow-y-auto space-y-1 border-t border-l border-secondary pl-2 pt-2">
+                {bookmarks.map((b, idx) => (
+                  <label key={idx} className="flex items-start gap-2 py-1 hover:bg-foreground/[0.02] cursor-pointer text-sm">
+                    <input type="checkbox" checked={b.selected} onChange={() => toggleBookmark(idx)}
+                      className="accent-accent mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-foreground/70 truncate">{b.title}</div>
+                      <div className="text-foreground/30 text-xs truncate">{b.url}</div>
+                      {b.tags && <div className="text-accent/40 text-xs mt-0.5">{b.tags}</div>}
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {/* Import progress & messages */}
+              {importProgress && <div className="text-accent text-sm">{importProgress}</div>}
+              {importMsg && <div className="text-sm text-accent">{importMsg}</div>}
+
+              <div className="flex gap-2 justify-end">
+                <button onClick={importBookmarks} disabled={importing || !bookmarks.some(b => b.selected)}
+                  className="px-4 py-2 text-sm text-foreground border-secondary border-t border-l border-r-6 border-b-6 hover:border-foreground/40 transition-colors disabled:opacity-30">
+                  {importing ? 'Importing...' : `Import ${bookmarks.filter(b => b.selected).length} bookmarks`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Room management panel */}
           {showRoomPanel && (
             <div className="mb-8 p-4 border-secondary border-t border-l border-r-6 border-b-6 space-y-4">
               <div className="text-foreground text-lg mb-2">Rooms</div>
@@ -176,6 +333,7 @@ export default function CreatePage() {
             </div>
           )}
 
+          {/* Form */}
           <div className="grid gap-14 md:grid-cols-[240px_1fr] items-start">
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">Title</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)}
@@ -206,7 +364,7 @@ export default function CreatePage() {
           {error && <div className="mt-4 text-destructive text-sm">{error}</div>}
 
           <div className="mt-10 flex justify-end gap-6">
-            <Button variant="outline" className="px-8 py-3 text-xl text-foreground border-foreground border-t border-l border-r-6 border-b-6" onClick={() => { setOpen(false); setError(''); }}>CANCEL</Button>
+            <Button variant="outline" className="px-8 py-3 text-xl text-foreground border-foreground border-t border-l border-r-6 border-b-6" onClick={() => { setOpen(false); setError(''); setBookmarks([]); }}>CANCEL</Button>
             <Button variant="outline" className="px-8 py-3 text-xl text-foreground border-secondary border-t border-l border-r-6 border-b-6 disabled:opacity-50" onClick={handleSave} disabled={saving}>{saving ? 'SAVING...' : 'SAVE'}</Button>
           </div>
         </DialogContent>
