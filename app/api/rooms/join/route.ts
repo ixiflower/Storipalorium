@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const existing = await db
       .select()
       .from(roomMembers)
-      .where(and(eq(roomMembers.roomId, room[0].id), eq(roomMembers.userId, session.user.id)))
+      .where(and(eq(roomMembers.roomId, room[0].id), eq(roomMembers.userId, session.user.id)));
 
     if (existing.length) {
       return NextResponse.json({ room: room[0], alreadyJoined: true });
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     await db.insert(roomMembers).values({
       roomId: room[0].id,
       userId: session.user.id,
+      name: session.user.name || session.user.email || '',
     });
 
     return NextResponse.json({ room: room[0] });

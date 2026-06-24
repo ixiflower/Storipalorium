@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Copy, Check, Trash2, Settings, Users, LogIn, ChevronDown, ChevronRight, Clock } from 'lucide-react';
+import { Plus, Copy, Check, Trash2, Settings, Users, LogIn, Clock, RefreshCw, UserX } from 'lucide-react';
 import type { RoomSettings } from '@/lib/db-schema';
 import { defaultRoomSettings, parseRoomSettings } from '@/lib/db-schema';
 
@@ -12,7 +12,8 @@ type Room = {
 };
 
 type Member = {
-  id: string; userId: string; roomId: string; joinedAt: Date | string | null;
+  id: string; userId: string; roomId: string; name: string | null;
+  joinedAt: Date | string | null;
 };
 
 export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; userId: string }) {
@@ -27,6 +28,7 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
   const [membersRoom, setMembersRoom] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [regeneratingCode, setRegeneratingCode] = useState<string | null>(null);
   const router = useRouter();
 
   const ic = "bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10";
@@ -67,6 +69,18 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
     } else setMsg(d.error || 'Failed');
   };
 
+  const regenerateCode = async (roomId: string) => {
+    setRegeneratingCode(roomId);
+    setMsg('');
+    const res = await fetch('/api/rooms', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: roomId, action: 'regenerate-code' }) });
+    const d = await res.json();
+    if (res.ok) {
+      setRooms(p => p.map(r => r.id === roomId ? d.room : r));
+      setMsg('Code regenerated.');
+    } else setMsg(d.error || 'Failed');
+    setRegeneratingCode(null);
+  };
+
   const toggleMembers = async (roomId: string) => {
     if (membersRoom === roomId) { setMembersRoom(null); setMembers([]); return; }
     setMembersRoom(roomId);
@@ -79,9 +93,26 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
     setLoadingMembers(false);
   };
 
+  const kickMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`Kick ${memberName} from the room?`)) return;
+    const res = await fetch(`/api/rooms/members?id=${memberId}`, { method: 'DELETE' });
+    const d = await res.json();
+    if (res.ok) {
+      setMembers(p => p.filter(m => m.id !== memberId));
+      setMsg(`${memberName} kicked.`);
+    } else setMsg(d.error || 'Failed');
+  };
+
   const formatDate = (d: Date | string | null) => {
     if (!d) return '';
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const displayName = (m: Member, room: Room) => {
+    if (m.name && m.name.trim()) return m.name;
+    if (m.userId === room.ownerId) return 'Owner';
+    // Fallback: show first 8 chars of userId
+    return m.userId.slice(0, 8) + '...';
   };
 
   return (
@@ -117,11 +148,21 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
                 <div className="p-4 flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <div className="text-foreground text-lg">{room.name}</div>
-                    <div className="text-foreground/40 text-xs mt-1">
-                      Code: <button onClick={() => copyCode(room.code)} className="hover:text-accent transition-colors inline-flex items-center gap-1">
+                    <div className="text-foreground/40 text-xs mt-1 flex items-center gap-2 flex-wrap">
+                      <span>Code: <button onClick={() => copyCode(room.code)} className="hover:text-accent transition-colors inline-flex items-center gap-1">
                         {copiedCode === room.code ? <Check className="w-3 h-3 text-accent" /> : <Copy className="w-3 h-3" />}{room.code}
-                      </button>
-                      {room.ownerId === userId && <span className="ml-2 text-accent/60">(owner)</span>}
+                      </button></span>
+                      {room.ownerId === userId && (
+                        <button
+                          onClick={() => regenerateCode(room.id)}
+                          disabled={regeneratingCode === room.id}
+                          className="text-foreground/30 hover:text-accent transition-colors inline-flex items-center gap-0.5 disabled:opacity-30"
+                          title="Regenerate invite code (old code stops working)"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${regeneratingCode === room.id ? 'animate-spin' : ''}`} />
+                        </button>
+                      )}
+                      {room.ownerId === userId && <span className="text-accent/60">(owner)</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -158,18 +199,29 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
                       <div className="space-y-1">
                         {members.map(m => (
                           <div key={m.id} className="flex items-center justify-between text-sm py-1 px-2 hover:bg-foreground/[0.02]">
-                            <div className="flex items-center gap-2 truncate">
-                              <span className="text-foreground/70 truncate max-w-[300px]">{m.userId}</span>
+                            <div className="flex items-center gap-2 truncate min-w-0">
+                              <span className="text-foreground/70 truncate">{displayName(m, room)}</span>
                               {m.userId === room.ownerId && (
                                 <span className="text-accent/60 text-xs shrink-0">(owner)</span>
                               )}
-                              {m.userId === userId && !(room.ownerId === userId) && (
+                              {m.userId === userId && !(room.ownerId === userId && m.userId === room.ownerId) && (
                                 <span className="text-foreground/30 text-xs shrink-0">(you)</span>
                               )}
                             </div>
-                            <span className="text-foreground/30 text-xs flex items-center gap-1 shrink-0">
-                              <Clock className="w-3 h-3" /> {formatDate(m.joinedAt)}
-                            </span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-foreground/30 text-xs flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> {formatDate(m.joinedAt)}
+                              </span>
+                              {room.ownerId === userId && m.userId !== userId && (
+                                <button
+                                  onClick={() => kickMember(m.id, displayName(m, room))}
+                                  className="text-foreground/20 hover:text-destructive transition-colors"
+                                  title={`Kick ${displayName(m, room)}`}
+                                >
+                                  <UserX className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

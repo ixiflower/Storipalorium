@@ -28,6 +28,7 @@ export const roomMembers = pgTable(
       .notNull()
       .references(() => rooms.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull(),
+    name: text('name').default(''),
     joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow(),
   },
   (t) => [uniqueIndex('room_member_unique').on(t.roomId, t.userId)],

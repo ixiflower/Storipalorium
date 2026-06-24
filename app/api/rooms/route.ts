@@ -21,7 +21,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Room name is required' }, { status: 400 });
     }
 
-    // Check for duplicate name by this owner
     const existing = await db
       .select()
       .from(rooms)
@@ -41,6 +40,7 @@ export async function POST(request: Request) {
     await db.insert(roomMembers).values({
       roomId: result[0].id,
       userId: session.user.id,
+      name: session.user.name || session.user.email || '',
     });
 
     return NextResponse.json({ room: result[0] }, { status: 201 });
@@ -85,7 +85,9 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const { id, settings } = await request.json();
+    const body = await request.json();
+    const { id, settings, action } = body;
+
     if (!id) {
       return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
     }
@@ -95,20 +97,31 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
     if (room[0].ownerId !== session.user.id) {
-      return NextResponse.json({ error: 'Only the room owner can change settings' }, { status: 403 });
+      return NextResponse.json({ error: 'Only the room owner can modify this room' }, { status: 403 });
     }
 
-    if (!settings) {
-      return NextResponse.json({ error: 'Settings object is required' }, { status: 400 });
+    // Regenerate invite code
+    if (action === 'regenerate-code') {
+      const newCode = generateCode();
+      const updated = await db
+        .update(rooms)
+        .set({ code: newCode })
+        .where(eq(rooms.id, id))
+        .returning();
+      return NextResponse.json({ room: updated[0] });
     }
 
-    const updated = await db
-      .update(rooms)
-      .set({ settings: JSON.stringify(settings) })
-      .where(eq(rooms.id, id))
-      .returning();
+    // Update settings
+    if (settings) {
+      const updated = await db
+        .update(rooms)
+        .set({ settings: JSON.stringify(settings) })
+        .where(eq(rooms.id, id))
+        .returning();
+      return NextResponse.json({ room: updated[0] });
+    }
 
-    return NextResponse.json({ room: updated[0] });
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   } catch (error) {
     console.error('Failed to update room:', error);
     return NextResponse.json({ error: 'Failed to update room' }, { status: 500 });
@@ -128,7 +141,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
     }
 
-    // Only the owner can delete
     const room = await db.select().from(rooms).where(eq(rooms.id, id)).limit(1);
     if (!room.length) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
