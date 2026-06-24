@@ -22,6 +22,7 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
   const [joinCode, setJoinCode] = useState('');
   const [msg, setMsg] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedPopupCode, setCopiedPopupCode] = useState<string | null>(null);
   const [settingsRoom, setSettingsRoom] = useState<Room | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
@@ -30,6 +31,7 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<'create' | 'join' | null>(null);
+  const [popup, setPopup] = useState<{ title: string; code?: string; name?: string } | null>(null);
   const router = useRouter();
 
   const ic = "bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10";
@@ -39,7 +41,7 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
     if (!newRoomName.trim()) return; setMsg('');
     const res = await fetch('/api/rooms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newRoomName.trim() }) });
     const d = await res.json();
-    if (res.ok) { setRooms(p => [...p, d.room]); setNewRoomName(''); setMsg(`Room created! Code: ${d.room.code}`); }
+    if (res.ok) { setRooms(p => [...p, d.room]); setNewRoomName(''); setActiveAction(null); setPopup({ title: 'Room Created!', code: d.room.code, name: d.room.name }); }
     else setMsg(d.error || 'Failed');
   };
 
@@ -47,7 +49,7 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
     if (!joinCode.trim()) return; setMsg('');
     const res = await fetch('/api/rooms/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: joinCode.trim() }) });
     const d = await res.json();
-    if (res.ok) { setRooms(p => p.find(r => r.id === d.room.id) ? p : [...p, d.room]); setJoinCode(''); setMsg(`Joined: ${d.room.name}`); router.refresh(); }
+    if (res.ok) { setRooms(p => p.find(r => r.id === d.room.id) ? p : [...p, d.room]); setJoinCode(''); setActiveAction(null); setPopup({ title: 'Joined Room!', name: d.room.name }); router.refresh(); }
     else setMsg(d.error || 'Invalid code');
   };
 
@@ -289,6 +291,37 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
         )}
 
       </div>
+
+      {/* Success popup */}
+      {popup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setPopup(null)}>
+          <div className="fixed inset-0 bg-background/70 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-md mx-4 p-8 border-accent/40 border-t border-l border-r-6 border-b-6 bg-background" onClick={(e) => e.stopPropagation()}>
+            <div className="text-2xl md:text-3xl text-foreground mb-4">{popup.title}</div>
+            {popup.name && <div className="text-foreground/60 text-lg mb-4">{popup.name}</div>}
+            {popup.code && (
+              <div className="mb-6">
+                <div className="text-foreground/40 text-sm mb-2">Invite code — share this:</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-foreground/[0.05] border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-2xl text-accent tracking-widest">{popup.code}</code>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(popup.code!); setCopiedPopupCode(popup.code!); setTimeout(() => setCopiedPopupCode(null), 2000); }}
+                    className="px-4 py-3 text-sm text-foreground border-secondary border-t border-l border-r-6 border-b-6 hover:border-foreground/40 transition-colors shrink-0"
+                  >
+                    {copiedPopupCode === popup.code ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => setPopup(null)}
+              className="w-full px-6 py-3 text-lg text-foreground border-foreground border-t border-l border-r-6 border-b-6 hover:opacity-75 transition-opacity"
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
