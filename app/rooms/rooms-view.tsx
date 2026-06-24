@@ -29,6 +29,7 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
   const [members, setMembers] = useState<Member[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<'create' | 'join' | null>(null);
   const router = useRouter();
 
   const ic = "bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10";
@@ -129,17 +130,50 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
         </div>
 
         {/* Create & Join */}
-        <div className="mb-10 p-6 border-secondary border-t border-l border-r-6 border-b-6 space-y-4">
-          <div className="text-foreground text-xl flex items-center gap-2"><Users className="w-5 h-5 text-accent" /> Create a Room</div>
-          <div className="flex gap-2 items-stretch">
-            <input placeholder="Room name" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && createRoom()} className={`flex-1 ${ic}`} />
-            <button onClick={createRoom} className={bc}><Plus className="w-4 h-4" /> Create</button>
+        <div className="mb-10 space-y-4">
+          <div className="flex gap-4 flex-col sm:flex-row">
+            <button
+              onClick={() => setActiveAction(activeAction === 'create' ? null : 'create')}
+              className={`flex-1 p-6 border-secondary border-t border-l border-r-6 border-b-6 text-left hover:border-foreground/30 transition-colors ${activeAction === 'create' ? 'border-accent/60' : ''}`}
+            >
+              <div className="flex items-center gap-3">
+                <Plus className="w-6 h-6 text-accent" />
+                <span className="text-xl md:text-2xl text-foreground">Create Room</span>
+              </div>
+              <div className="text-foreground/40 text-sm mt-2">Start a new shared space for your links</div>
+            </button>
+            <button
+              onClick={() => setActiveAction(activeAction === 'join' ? null : 'join')}
+              className={`flex-1 p-6 border-secondary border-t border-l border-r-6 border-b-6 text-left hover:border-foreground/30 transition-colors ${activeAction === 'join' ? 'border-accent/60' : ''}`}
+            >
+              <div className="flex items-center gap-3">
+                <LogIn className="w-6 h-6 text-accent" />
+                <span className="text-xl md:text-2xl text-foreground">Join Room</span>
+              </div>
+              <div className="text-foreground/40 text-sm mt-2">Enter an invite code to join an existing room</div>
+            </button>
           </div>
-          <div className="text-foreground/40 text-sm pt-2">Join existing room</div>
-          <div className="flex gap-2 items-stretch">
-            <input placeholder="Invite code" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && joinRoom()} maxLength={8} className={`flex-1 ${ic} uppercase`} />
-            <button onClick={joinRoom} className={bc}><LogIn className="w-4 h-4" /> Join</button>
-          </div>
+
+          {activeAction === 'create' && (
+            <div className="p-6 border-secondary border-t border-l border-r-6 border-b-6 space-y-4">
+              <div className="text-foreground text-lg">Create a Room</div>
+              <div className="flex gap-2 items-stretch">
+                <input placeholder="Room name" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && createRoom()} className={`flex-1 ${ic}`} autoFocus />
+                <button onClick={createRoom} className={bc}><Plus className="w-4 h-4" /> Create</button>
+              </div>
+            </div>
+          )}
+
+          {activeAction === 'join' && (
+            <div className="p-6 border-secondary border-t border-l border-r-6 border-b-6 space-y-4">
+              <div className="text-foreground text-lg">Join a Room</div>
+              <div className="flex gap-2 items-stretch">
+                <input placeholder="Invite code" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && joinRoom()} maxLength={8} className={`flex-1 ${ic} uppercase`} autoFocus />
+                <button onClick={joinRoom} className={bc}><LogIn className="w-4 h-4" /> Join</button>
+              </div>
+            </div>
+          )}
+
           {msg && <div className="text-sm text-accent">{msg}</div>}
         </div>
 
