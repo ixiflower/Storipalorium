@@ -15,8 +15,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, link, category, roomId, tags, shareFromId } = body;
 
-    // Share: copy an existing item to a target room
-    if (shareFromId && roomId) {
+    // Share: copy an existing item to a target room (or private)
+    if (shareFromId) {
       const source = await db.select().from(items).where(eq(items.id, shareFromId)).limit(1);
       if (!source.length) return error('Source item not found', 404);
 
@@ -32,17 +32,18 @@ export async function POST(request: Request) {
         }
       }
 
-      // Must be a member of target room
-      const tgtMember = await db.select().from(roomMembers)
-        .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, session.user.id))).limit(1);
-      if (!tgtMember.length) return error('Not a member of target room', 403);
+      if (roomId) {
+        // Sharing to a room: must be a member + respect add permissions
+        const tgtMember = await db.select().from(roomMembers)
+          .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, session.user.id))).limit(1);
+        if (!tgtMember.length) return error('Not a member of target room', 403);
 
-      // Check target room add permissions
-      const tgtRoom = await db.select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
-      if (tgtRoom.length) {
-        const tgtSettings = parseRoomSettings(tgtRoom[0].settings);
-        if (tgtSettings.whoCanAdd === 'owner' && tgtRoom[0].ownerId !== session.user.id) {
-          return error('Only the room owner can add items to this room', 403);
+        const tgtRoom = await db.select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+        if (tgtRoom.length) {
+          const tgtSettings = parseRoomSettings(tgtRoom[0].settings);
+          if (tgtSettings.whoCanAdd === 'owner' && tgtRoom[0].ownerId !== session.user.id) {
+            return error('Only the room owner can add items to this room', 403);
+          }
         }
       }
 
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
         title: src.title,
         link: src.link,
         category: src.category,
-        roomId,
+        roomId: roomId || null,
         tags: src.tags,
       };
       const result = await db.insert(items).values(copy).returning();

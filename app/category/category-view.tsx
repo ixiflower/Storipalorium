@@ -230,19 +230,22 @@ export function CategoryView({
 
   const sharingItem = sharingItemId ? allItemsWithSource.find(a => a.item.id === sharingItemId)?.item : null;
 
-  const handleShare = async (targetRoomId: string) => {
+  const handleShare = async (targetRoomId: string | null) => {
     if (!sharingItemId) return;
     setSharing(true);
+    const body: Record<string, unknown> = { shareFromId: sharingItemId };
+    if (targetRoomId) body.roomId = targetRoomId;
     const r = await fetch('/api/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shareFromId: sharingItemId, roomId: targetRoomId }),
+      body: JSON.stringify(body),
     });
     setSharing(false);
     if (r.ok) {
-      const targetRoom = userRooms.find(rr => rr.id === targetRoomId);
-      const roomName = targetRoom?.name || 'room';
-      window.location.href = '/category?notify=' + encodeURIComponent('Shared to ' + roomName);
+      const label = targetRoomId
+        ? (userRooms.find(rr => rr.id === targetRoomId)?.name || 'room')
+        : 'Private';
+      window.location.href = '/category?notify=' + encodeURIComponent('Shared to ' + label);
     }
   };
 
@@ -369,8 +372,16 @@ export function CategoryView({
           <div className="relative z-10 w-full max-w-md mx-4 p-6 border-accent/40 border-t border-l border-r-6 border-b-6 bg-background" onClick={e => e.stopPropagation()}>
             <div className="text-xl text-foreground mb-2">Share to room</div>
             <div className="text-foreground/40 text-sm mb-1 truncate">{sharingItem.title}</div>
-            <div className="text-foreground/20 text-xs mb-6">Choose a destination room</div>
+            <div className="text-foreground/20 text-xs mb-6">Choose a destination</div>
             <div className="space-y-2 mb-4">
+              {/* Private option — only show if item is in a room */}
+              {sharingItem.roomId && (
+                <button onClick={() => handleShare(null)} disabled={sharing}
+                  className="w-full text-left px-4 py-3 border-secondary border-t border-l border-r-6 border-b-6 hover:border-accent/40 transition-colors">
+                  <div className="text-foreground text-sm">Private</div>
+                  <div className="text-foreground/30 text-xs">Save to your personal collection</div>
+                </button>
+              )}
               {userRooms.filter(r => r.id !== sharingItem.roomId).length === 0 ? (
                 <div className="text-foreground/40 text-sm py-4 text-center">No other rooms available</div>
               ) : (
