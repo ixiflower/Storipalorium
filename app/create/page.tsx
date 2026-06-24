@@ -125,7 +125,7 @@ export default function CreatePage() {
       if (res.status === 401) { router.push('/login'); return; }
       if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to save'); return; }
       setOpen(false); setTitle(''); setLink(''); setCategory('notes'); setCustomCat(''); setIsCustomCategory(false); setTags('');
-      router.refresh();
+      router.push('/create?notify=Saved');
     } catch { setError('Network error.'); }
     finally { setSaving(false); }
   };
@@ -229,7 +229,10 @@ export default function CreatePage() {
     setImportMsg(`Done: ${ok} imported, ${fail} failed, ${bookmarks.filter(b => b.duplicate && b.action === 'skip').length} duplicates skipped.`);
     setImportProgress(null);
     setImporting(false);
-    if (ok > 0) { setBookmarks([]); router.refresh(); }
+    if (ok > 0) {
+      setBookmarks([]);
+      router.push('/category?notify=' + encodeURIComponent(`Imported ${ok} bookmark${ok !== 1 ? 's' : ''}`));
+    }
   };
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);

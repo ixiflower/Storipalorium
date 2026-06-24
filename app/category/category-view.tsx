@@ -29,7 +29,7 @@ function ItemLeaf({ item, depth, editingId, onEditingChange, onShare }: {
   const handleDelete = async () => {
     setDeleting(true);
     const r = await fetch(`/api/items?id=${item.id}`, { method: 'DELETE' });
-    if (r.ok) window.location.reload();
+    if (r.ok) window.location.href = '/category?notify=Deleted';
     else setDeleting(false);
   };
 
@@ -45,7 +45,7 @@ function ItemLeaf({ item, depth, editingId, onEditingChange, onShare }: {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: item.id, title: eTitle.trim(), link: eLink.trim(), category: eCategory, tags: eTags }),
     });
-    if (r.ok) window.location.reload();
+    if (r.ok) window.location.href = '/category?notify=Updated';
     else setESaving(false);
   };
 
@@ -216,7 +216,11 @@ export function CategoryView({
       body: JSON.stringify({ shareFromId: sharingItemId, roomId: targetRoomId }),
     });
     setSharing(false);
-    if (r.ok) window.location.reload();
+    if (r.ok) {
+      const targetRoom = userRooms.find(rr => rr.id === targetRoomId);
+      const roomName = targetRoom?.name || 'room';
+      window.location.href = '/category?notify=' + encodeURIComponent('Shared to ' + roomName);
+    }
   };
 
   const results = useMemo(() => {
