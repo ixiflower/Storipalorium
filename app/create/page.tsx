@@ -83,7 +83,7 @@ export default function CreatePage() {
   const [importRoom, setImportRoom] = useState('private');
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState('');
-  const [importProgress, setImportProgress] = useState('');
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
 
   useEffect(() => {
     fetch('/api/rooms').then(r => r.json()).then(d => { if (d.rooms) setRooms(d.rooms); }).catch(() => {});
@@ -149,7 +149,7 @@ export default function CreatePage() {
       setBookmarks(entries);
       setImportRoom(selectedRoomId);
       setImportMsg('');
-      setImportProgress('');
+      setImportProgress(null);
     };
     reader.readAsText(file);
     // Reset so same file can be re-picked
@@ -168,11 +168,11 @@ export default function CreatePage() {
   const importBookmarks = async () => {
     const toImport = bookmarks.filter(b => b.selected);
     if (!toImport.length) { setImportMsg('No bookmarks selected.'); return; }
-    setImporting(true); setImportMsg(''); setImportProgress('');
+    setImporting(true); setImportMsg(''); setImportProgress({ current: 0, total: toImport.length });
     let ok = 0; let fail = 0;
     for (let i = 0; i < toImport.length; i++) {
       const b = toImport[i];
-      setImportProgress(`Importing ${i + 1}/${toImport.length}...`);
+      setImportProgress({ current: i + 1, total: toImport.length });
       try {
         const body: Record<string, string> = { title: b.title, link: b.url, category: 'links', tags: b.tags };
         if (importRoom !== 'private') body.roomId = importRoom;
@@ -181,7 +181,7 @@ export default function CreatePage() {
       } catch { fail++; }
     }
     setImportMsg(`Done: ${ok} imported, ${fail} failed.`);
-    setImportProgress('');
+    setImportProgress(null);
     setImporting(false);
     if (ok > 0) { setBookmarks([]); router.refresh(); }
   };
@@ -280,7 +280,21 @@ export default function CreatePage() {
               </div>
 
               {/* Import progress & messages */}
-              {importProgress && <div className="text-accent text-sm">{importProgress}</div>}
+              {/* Import progress bar */}
+              {importProgress && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-foreground/40">
+                    <span>Importing...</span>
+                    <span>{importProgress.current}/{importProgress.total}</span>
+                  </div>
+                  <div className="h-2 border-secondary border-t border-l border-r-6 border-b-6 overflow-hidden">
+                    <div
+                      className="h-full bg-accent transition-all duration-300 ease-out"
+                      style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               {importMsg && <div className="text-sm text-accent">{importMsg}</div>}
 
               <div className="flex gap-2 justify-end">

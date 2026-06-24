@@ -78,7 +78,7 @@ function ItemLeaf({ item, depth, editingId, onEditingChange }: {
       <div className="flex-1 min-w-0">
         <div className="text-foreground/70 text-sm">{item.title}</div>
         {item.link && (
-          <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-accent/60 text-xs hover:underline break-all">{item.link}</a>
+          <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-accent/60 text-xs hover:underline truncate block max-w-full">{item.link}</a>
         )}
         {tagList.length > 0 && (
           <div className="flex gap-1 mt-1 flex-wrap">
