@@ -62,9 +62,11 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
     else { const d = await res.json(); setMsg(d.error || 'Failed'); }
   };
 
-  const saveSettings = async (roomId: string, settings: RoomSettings) => {
+  const saveSettings = async (roomId: string, settings: RoomSettings, newName?: string) => {
     setMsg('');
-    const res = await fetch('/api/rooms', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: roomId, settings }) });
+    const body: Record<string, unknown> = { id: roomId, settings };
+    if (newName) body.name = newName;
+    const res = await fetch('/api/rooms', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await res.json();
     if (res.ok) {
       setRooms(p => p.map(r => r.id === roomId ? d.room : r));
@@ -326,14 +328,15 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
   );
 }
 
-function SettingsPanel({ room, onSave, onClose }: { room: Room; onSave: (id: string, s: RoomSettings) => void; onClose: () => void }) {
+function SettingsPanel({ room, onSave, onClose }: { room: Room; onSave: (id: string, s: RoomSettings, name?: string) => void; onClose: () => void }) {
   const current = parseRoomSettings(room.settings);
   const [s, setS] = useState<RoomSettings>(current);
+  const [roomName, setRoomName] = useState(room.name);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave(room.id, s);
+    await onSave(room.id, s, roomName !== room.name ? roomName : undefined);
     setSaving(false);
   };
 
@@ -343,6 +346,13 @@ function SettingsPanel({ room, onSave, onClose }: { room: Room; onSave: (id: str
   return (
     <div className="p-4 border-t border-secondary space-y-4">
       <div className="text-foreground text-lg flex items-center gap-2"><Settings className="w-4 h-4 text-accent" /> Room Settings</div>
+
+      <div>
+        <label className={labelCls}>Room name</label>
+        <input value={roomName} onChange={(e) => setRoomName(e.target.value)}
+          placeholder="Room name"
+          className="bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10 w-full" />
+      </div>
 
       <div>
         <label className={labelCls}>Who can add items</label>

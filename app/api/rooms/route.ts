@@ -86,7 +86,7 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, settings, action } = body;
+    const { id, settings, action, name } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
@@ -98,6 +98,16 @@ export async function PATCH(request: Request) {
     }
     if (room[0].ownerId !== session.user.id) {
       return NextResponse.json({ error: 'Only the room owner can modify this room' }, { status: 403 });
+    }
+
+    // Rename room
+    if (name !== undefined && name.trim()) {
+      const updated = await db
+        .update(rooms)
+        .set({ name: name.trim() })
+        .where(eq(rooms.id, id))
+        .returning();
+      return NextResponse.json({ room: updated[0] });
     }
 
     // Regenerate invite code
