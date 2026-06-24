@@ -25,5 +25,7 @@ export default async function RoomsPage() {
     .where(eq(roomMembers.userId, session.user.id))
     .orderBy(rooms.createdAt);
 
-  return <RoomsView rooms={userRooms} userId={session.user.id} userName={session.user.email?.split('@')[0] || session.user.id.slice(0, 8)} />;
+  const uname = (session.user as any).name || (session.user as any).user_metadata?.name || session.user.email?.split('@')[0] || session.user.id.slice(0, 8);
+
+  return <RoomsView rooms={userRooms} userId={session.user.id} userName={uname} />;
 }

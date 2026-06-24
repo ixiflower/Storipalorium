@@ -109,13 +109,13 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
   };
 
   const displayName = (m: Member, room: Room) => {
+    // Current user: use name from session (most accurate)
+    if (m.userId === userId && userName) return userName;
     const n = (m.name || '').trim();
     if (n) {
       if (n.includes('@')) return n.split('@')[0];
       return n;
     }
-    // Current user fallback
-    if (m.userId === userId) return userName || 'You';
     if (m.userId === room.ownerId) return 'Owner';
     return m.userId.slice(0, 8) + '...';
   };

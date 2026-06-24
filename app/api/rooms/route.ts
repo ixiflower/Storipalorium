@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     await db.insert(roomMembers).values({
       roomId: result[0].id,
       userId: session.user.id,
-      name: (session.user as any).user_metadata?.name || session.user.email || '',
+      name: (session.user as any).name || (session.user as any).user_metadata?.name || session.user.email || '',
     });
 
     return NextResponse.json({ room: result[0] }, { status: 201 });
