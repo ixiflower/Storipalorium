@@ -272,22 +272,22 @@ export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Ro
                 {settingsRoom?.id === room.id && (
                   <SettingsPanel room={room} onSave={saveSettings} onClose={() => setSettingsRoom(null)} />
                 )}
+                {/* Delete confirmation — inline inside this room */}
+                {deleteTarget?.id === room.id && (
+                  <div className="p-4 border-t border-destructive/30 space-y-2">
+                    <div className="text-destructive text-sm">Delete <strong>{deleteTarget.name}</strong>? Type the name to confirm.</div>
+                    <div className="flex gap-2 items-stretch">
+                      <input value={deleteConfirmName} onChange={(e) => setDeleteConfirmName(e.target.value)} placeholder={deleteTarget.name} className={`flex-1 ${ic}`} autoFocus />
+                      <button onClick={deleteRoom} disabled={deleteConfirmName !== deleteTarget.name} className={`${bc} text-destructive border-destructive/50`}>Delete</button>
+                      <button onClick={() => { setDeleteTarget(null); setDeleteConfirmName(''); }} className={bc}>Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
 
-        {/* Delete confirmation */}
-        {deleteTarget && (
-          <div className="mt-6 p-4 border-destructive/30 border-t border-l border-r-6 border-b-6 space-y-2">
-            <div className="text-destructive text-sm">Delete <strong>{deleteTarget.name}</strong>? Type the name to confirm.</div>
-            <div className="flex gap-2 items-stretch">
-              <input value={deleteConfirmName} onChange={(e) => setDeleteConfirmName(e.target.value)} placeholder={deleteTarget.name} className={`flex-1 ${ic}`} />
-              <button onClick={deleteRoom} disabled={deleteConfirmName !== deleteTarget.name} className={`${bc} text-destructive border-destructive/50`}>Delete</button>
-              <button onClick={() => { setDeleteTarget(null); setDeleteConfirmName(''); }} className={bc}>Cancel</button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
