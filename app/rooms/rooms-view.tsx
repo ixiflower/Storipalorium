@@ -16,7 +16,7 @@ type Member = {
   joinedAt: Date | string | null;
 };
 
-export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; userId: string }) {
+export function RoomsView({ rooms: initialRooms, userId, userName }: { rooms: Room[]; userId: string; userName: string }) {
   const [rooms, setRooms] = useState(initialRooms);
   const [newRoomName, setNewRoomName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -109,9 +109,14 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
   };
 
   const displayName = (m: Member, room: Room) => {
-    if (m.name && m.name.trim()) return m.name;
+    const n = (m.name || '').trim();
+    if (n) {
+      if (n.includes('@')) return n.split('@')[0];
+      return n;
+    }
+    // Current user fallback
+    if (m.userId === userId) return userName || 'You';
     if (m.userId === room.ownerId) return 'Owner';
-    // Fallback: show first 8 chars of userId
     return m.userId.slice(0, 8) + '...';
   };
 
