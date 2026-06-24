@@ -194,6 +194,7 @@ export function CategoryView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sharingItemId, setSharingItemId] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const totalItems = privateItems.length + Object.values(roomItemsMap).reduce((s, a) => s + a.length, 0);
 
   const allItemsWithSource = useMemo(() => {
@@ -204,6 +205,28 @@ export function CategoryView({
         all.push({ item: i, source: room.name });
     return all;
   }, [privateItems, userRooms, roomItemsMap]);
+
+  // Extract all unique tags across all items
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const { item } of allItemsWithSource) {
+      if (item.tags) {
+        for (const t of item.tags.split(',').map(s => s.trim()).filter(Boolean)) {
+          tagSet.add(t.startsWith('#') ? t : '#' + t);
+        }
+      }
+    }
+    return [...tagSet].sort((a, b) => a.localeCompare(b));
+  }, [allItemsWithSource]);
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  };
 
   const sharingItem = sharingItemId ? allItemsWithSource.find(a => a.item.id === sharingItemId)?.item : null;
 
@@ -224,17 +247,30 @@ export function CategoryView({
   };
 
   const results = useMemo(() => {
-    if (!query.trim()) return null;
-    const q = query.toLowerCase();
-    return allItemsWithSource.filter(({ item }) =>
-      item.title.toLowerCase().includes(q) ||
-      (item.link || '').toLowerCase().includes(q) ||
-      item.category.toLowerCase().includes(q) ||
-      (item.tags || '').toLowerCase().includes(q)
-    );
-  }, [allItemsWithSource, query]);
+    if (!query.trim() && selectedTags.size === 0) return null;
+    const q = query.toLowerCase().trim();
+    return allItemsWithSource.filter(({ item }) => {
+      // Search filter
+      if (q && !(
+        item.title.toLowerCase().includes(q) ||
+        (item.link || '').toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        (item.tags || '').toLowerCase().includes(q)
+      )) return false;
+      // Tag filter (AND — item must have ALL selected tags)
+      if (selectedTags.size > 0) {
+        const itemTags = new Set(
+          (item.tags || '').split(',').map(s => s.trim()).filter(Boolean).map(t => t.startsWith('#') ? t : '#' + t)
+        );
+        for (const t of selectedTags) {
+          if (!itemTags.has(t)) return false;
+        }
+      }
+      return true;
+    });
+  }, [allItemsWithSource, query, selectedTags]);
 
-  const isSearching = query.trim().length > 0;
+  const isFiltering = query.trim().length > 0 || selectedTags.size > 0;
 
   return (
     <div className="min-h-screen pt-24 px-8 md:px-16 pb-20">
@@ -258,6 +294,31 @@ export function CategoryView({
               </button>
             )}
           </div>
+          {/* Tag filter chips */}
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {allTags.map(tag => {
+                const active = selectedTags.has(tag);
+                return (
+                  <button key={tag} onClick={() => toggleTag(tag)}
+                    className={`px-2.5 py-1 text-xs transition-colors border-t border-l border-r-6 border-b-6 ${
+                      active
+                        ? 'border-accent/60 text-accent bg-accent/[0.05]'
+                        : 'border-secondary text-foreground/30 hover:text-foreground/60 hover:border-foreground/20'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+              {selectedTags.size > 0 && (
+                <button onClick={() => setSelectedTags(new Set())}
+                  className="px-2 py-1 text-xs text-foreground/30 hover:text-destructive transition-colors">
+                  <X className="w-3 h-3 inline mr-0.5" />clear
+                </button>
+              )}
+            </div>
+          )}
           {results && (
             <div className="mt-4">
               <div className="text-foreground/30 text-xs mb-4">
@@ -285,8 +346,8 @@ export function CategoryView({
             <div className="text-foreground/40 text-xl mb-6">Your collection is empty</div>
             <Link href="/create" className="inline-block px-10 py-4 text-xl text-foreground border-secondary border-t border-l border-r-6 border-b-6 hover:border-foreground/40 transition-colors">ADD SOMETHING</Link>
           </div>
-        ) : isSearching ? (
-          results && results.length > 0 ? null : <div className="text-center py-12 text-foreground/40">Type to search across all your items</div>
+        ) : isFiltering ? (
+          results && results.length > 0 ? null : <div className="text-center py-12 text-foreground/40">No items match your filters</div>
         ) : (
           <div className="space-y-6 border-l border-foreground/10 pl-2">
             {privateItems.length > 0 && (
