@@ -76,7 +76,7 @@ function ItemLeaf({ item, depth, editingId, onEditingChange }: {
     <div className="group flex items-start gap-2 py-2 px-2 hover:bg-foreground/[0.03] transition-colors" style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}>
       <span className="text-foreground/15 shrink-0 mt-0.5">└</span>
       <div className="flex-1 min-w-0">
-        <div className="text-foreground/70 text-sm">{item.title}</div>
+        <div className="text-foreground/70 text-sm line-clamp-2">{item.title}</div>
         {item.link && (
           <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-accent/60 text-xs hover:underline truncate block max-w-full">{item.link}</a>
         )}
