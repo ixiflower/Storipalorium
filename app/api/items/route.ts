@@ -13,7 +13,51 @@ export async function POST(request: Request) {
   if (!session?.user) return error('Unauthorized', 401);
   try {
     const body = await request.json();
-    const { title, link, category, roomId, tags } = body;
+    const { title, link, category, roomId, tags, shareFromId } = body;
+
+    // Share: copy an existing item to a target room
+    if (shareFromId && roomId) {
+      const source = await db.select().from(items).where(eq(items.id, shareFromId)).limit(1);
+      if (!source.length) return error('Source item not found', 404);
+
+      const src = source[0];
+      // Must have access to source: own it, or be in its room
+      if (src.userId !== session.user.id) {
+        if (src.roomId) {
+          const srcMember = await db.select().from(roomMembers)
+            .where(and(eq(roomMembers.roomId, src.roomId), eq(roomMembers.userId, session.user.id))).limit(1);
+          if (!srcMember.length) return error('Not a member of source room', 403);
+        } else {
+          return error('Not your item', 403);
+        }
+      }
+
+      // Must be a member of target room
+      const tgtMember = await db.select().from(roomMembers)
+        .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, session.user.id))).limit(1);
+      if (!tgtMember.length) return error('Not a member of target room', 403);
+
+      // Check target room add permissions
+      const tgtRoom = await db.select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+      if (tgtRoom.length) {
+        const tgtSettings = parseRoomSettings(tgtRoom[0].settings);
+        if (tgtSettings.whoCanAdd === 'owner' && tgtRoom[0].ownerId !== session.user.id) {
+          return error('Only the room owner can add items to this room', 403);
+        }
+      }
+
+      const copy: NewItem = {
+        userId: session.user.id,
+        title: src.title,
+        link: src.link,
+        category: src.category,
+        roomId,
+        tags: src.tags,
+      };
+      const result = await db.insert(items).values(copy).returning();
+      return NextResponse.json({ item: result[0], shared: true }, { status: 201 });
+    }
+
     if (!title || !category) return error('Title and category are required', 400);
 
     if (roomId) {

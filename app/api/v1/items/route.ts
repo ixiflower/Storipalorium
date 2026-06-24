@@ -24,7 +24,34 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const userId = await validateBearerToken(request);
   if (!userId) return err('Invalid or missing API token', 401);
-  const { title, link, category, roomId, tags } = await request.json();
+  const { title, link, category, roomId, tags, shareFromId } = await request.json();
+
+  // Share: copy an existing item to a target room
+  if (shareFromId && roomId) {
+    const source = await db.select().from(items).where(eq(items.id, shareFromId)).limit(1);
+    if (!source.length) return err('Source item not found', 404);
+    const src = source[0];
+    if (src.userId !== userId) {
+      if (src.roomId) {
+        const srcMember = await db.select().from(roomMembers)
+          .where(and(eq(roomMembers.roomId, src.roomId), eq(roomMembers.userId, userId))).limit(1);
+        if (!srcMember.length) return err('Not a member of source room', 403);
+      } else return err('Not your item', 403);
+    }
+    const tgtMember = await db.select().from(roomMembers)
+      .where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, userId))).limit(1);
+    if (!tgtMember.length) return err('Not a member of target room', 403);
+    const tgtRoom = await db.select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+    if (tgtRoom.length) {
+      const tgtSettings = parseRoomSettings(tgtRoom[0].settings);
+      if (tgtSettings.whoCanAdd === 'owner' && tgtRoom[0].ownerId !== userId) return err('Only owner can add items', 403);
+    }
+    const result = await db.insert(items).values({
+      userId, title: src.title, link: src.link, category: src.category, roomId, tags: src.tags,
+    }).returning();
+    return NextResponse.json({ item: result[0], shared: true }, { status: 201 });
+  }
+
   if (!title) return err('Title is required', 400);
   if (roomId) {
     const member = await db.select().from(roomMembers).where(and(eq(roomMembers.roomId, roomId), eq(roomMembers.userId, userId))).limit(1);

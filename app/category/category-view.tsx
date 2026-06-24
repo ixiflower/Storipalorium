@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen, Pencil } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen, Pencil, Share2 } from 'lucide-react';
 
 type Item = {
   id: string; title: string; link: string | null; category: string;
@@ -11,10 +11,11 @@ type Item = {
 type Room = { id: string; name: string; code: string };
 type SortMode = 'newest' | 'oldest' | 'name';
 
-function ItemLeaf({ item, depth, editingId, onEditingChange }: {
+function ItemLeaf({ item, depth, editingId, onEditingChange, onShare }: {
   item: Item; depth: number;
   editingId: string | null;
   onEditingChange: (id: string | null) => void;
+  onShare: (id: string) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
   const isEditing = editingId === item.id;
@@ -89,6 +90,9 @@ function ItemLeaf({ item, depth, editingId, onEditingChange }: {
       <button onClick={handleEdit} className="text-foreground/20 hover:text-accent transition-all shrink-0 mt-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
         <Pencil className="w-3.5 h-3.5" />
       </button>
+      <button onClick={() => onShare(item.id)} className="text-foreground/20 hover:text-accent transition-all shrink-0 mt-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+        <Share2 className="w-3.5 h-3.5" />
+      </button>
       <button onClick={handleDelete} disabled={deleting}
         className="text-foreground/20 hover:text-destructive transition-all shrink-0 mt-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
         <Trash2 className="w-3.5 h-3.5" />
@@ -97,10 +101,11 @@ function ItemLeaf({ item, depth, editingId, onEditingChange }: {
   );
 }
 
-function CategoryNode({ name, items, depth, editingId, onEditingChange }: {
+function CategoryNode({ name, items, depth, editingId, onEditingChange, onShare }: {
   name: string; items: Item[]; depth: number;
   editingId: string | null;
   onEditingChange: (id: string | null) => void;
+  onShare: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const indent = depth * 1.5;
@@ -118,7 +123,7 @@ function CategoryNode({ name, items, depth, editingId, onEditingChange }: {
       {open && (
         <div>
           {items.map(item => (
-            <ItemLeaf key={item.id} item={item} depth={depth + 1} editingId={editingId} onEditingChange={onEditingChange} />
+            <ItemLeaf key={item.id} item={item} depth={depth + 1} editingId={editingId} onEditingChange={onEditingChange} onShare={onShare} />
           ))}
         </div>
       )}
@@ -126,10 +131,11 @@ function CategoryNode({ name, items, depth, editingId, onEditingChange }: {
   );
 }
 
-function SectionNode({ title, items, depth, defaultOpen, editingId, onEditingChange }: {
+function SectionNode({ title, items, depth, defaultOpen, editingId, onEditingChange, onShare }: {
   title: string; items: Item[]; depth: number; defaultOpen: boolean;
   editingId: string | null;
   onEditingChange: (id: string | null) => void;
+  onShare: (id: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [sort, setSort] = useState<SortMode>('newest');
@@ -169,7 +175,7 @@ function SectionNode({ title, items, depth, defaultOpen, editingId, onEditingCha
       {open && (
         <div>
           {Object.entries(grouped).map(([cat, catItems]) => (
-            <CategoryNode key={cat} name={cat} items={catItems} depth={depth + 1} editingId={editingId} onEditingChange={onEditingChange} />
+            <CategoryNode key={cat} name={cat} items={catItems} depth={depth + 1} editingId={editingId} onEditingChange={onEditingChange} onShare={onShare} />
           ))}
         </div>
       )}
@@ -186,9 +192,11 @@ export function CategoryView({
 }) {
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [sharingItemId, setSharingItemId] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const totalItems = privateItems.length + Object.values(roomItemsMap).reduce((s, a) => s + a.length, 0);
 
-  const allItems = useMemo(() => {
+  const allItemsWithSource = useMemo(() => {
     const all: { item: Item; source: string }[] = [];
     for (const i of privateItems) all.push({ item: i, source: 'Private' });
     for (const room of userRooms)
@@ -197,16 +205,30 @@ export function CategoryView({
     return all;
   }, [privateItems, userRooms, roomItemsMap]);
 
+  const sharingItem = sharingItemId ? allItemsWithSource.find(a => a.item.id === sharingItemId)?.item : null;
+
+  const handleShare = async (targetRoomId: string) => {
+    if (!sharingItemId) return;
+    setSharing(true);
+    const r = await fetch('/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shareFromId: sharingItemId, roomId: targetRoomId }),
+    });
+    setSharing(false);
+    if (r.ok) window.location.reload();
+  };
+
   const results = useMemo(() => {
     if (!query.trim()) return null;
     const q = query.toLowerCase();
-    return allItems.filter(({ item }) =>
+    return allItemsWithSource.filter(({ item }) =>
       item.title.toLowerCase().includes(q) ||
       (item.link || '').toLowerCase().includes(q) ||
       item.category.toLowerCase().includes(q) ||
       (item.tags || '').toLowerCase().includes(q)
     );
-  }, [allItems, query]);
+  }, [allItemsWithSource, query]);
 
   const isSearching = query.trim().length > 0;
 
@@ -245,7 +267,7 @@ export function CategoryView({
                     const grouped: Record<string, { item: Item; source: string }[]> = {};
                     for (const r of results) (grouped[r.source] ||= []).push(r);
                     return Object.entries(grouped).map(([src, items]) => (
-                      <SectionNode key={src} title={src} items={items.map(x => x.item)} depth={0} defaultOpen={true} editingId={editingId} onEditingChange={setEditingId} />
+                      <SectionNode key={src} title={src} items={items.map(x => x.item)} depth={0} defaultOpen={true} editingId={editingId} onEditingChange={setEditingId} onShare={setSharingItemId} />
                     ));
                   })()}
                 </div>
@@ -264,16 +286,45 @@ export function CategoryView({
         ) : (
           <div className="space-y-6 border-l border-foreground/10 pl-2">
             {privateItems.length > 0 && (
-              <SectionNode title="Private" items={privateItems} depth={0} defaultOpen={true} editingId={editingId} onEditingChange={setEditingId} />
+              <SectionNode title="Private" items={privateItems} depth={0} defaultOpen={true} editingId={editingId} onEditingChange={setEditingId} onShare={setSharingItemId} />
             )}
             {userRooms.map(room => {
               const ri = roomItemsMap[room.id] || [];
               if (ri.length === 0) return null;
-              return <SectionNode key={room.id} title={room.name} items={ri} depth={0} defaultOpen={ri.length > 0} editingId={editingId} onEditingChange={setEditingId} />;
+              return <SectionNode key={room.id} title={room.name} items={ri} depth={0} defaultOpen={ri.length > 0} editingId={editingId} onEditingChange={setEditingId} onShare={setSharingItemId} />;
             })}
           </div>
         )}
       </div>
+
+      {/* Share modal */}
+      {sharingItemId && sharingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setSharingItemId(null)}>
+          <div className="fixed inset-0 bg-background/70 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-md mx-4 p-6 border-accent/40 border-t border-l border-r-6 border-b-6 bg-background" onClick={e => e.stopPropagation()}>
+            <div className="text-xl text-foreground mb-2">Share to room</div>
+            <div className="text-foreground/40 text-sm mb-1 truncate">{sharingItem.title}</div>
+            <div className="text-foreground/20 text-xs mb-6">Choose a destination room</div>
+            <div className="space-y-2 mb-4">
+              {userRooms.filter(r => r.id !== sharingItem.roomId).length === 0 ? (
+                <div className="text-foreground/40 text-sm py-4 text-center">No other rooms available</div>
+              ) : (
+                userRooms.filter(r => r.id !== sharingItem.roomId).map(room => (
+                  <button key={room.id} onClick={() => handleShare(room.id)} disabled={sharing}
+                    className="w-full text-left px-4 py-3 border-secondary border-t border-l border-r-6 border-b-6 hover:border-accent/40 transition-colors">
+                    <div className="text-foreground text-sm">{room.name}</div>
+                    <div className="text-foreground/30 text-xs">Code: {room.code}</div>
+                  </button>
+                ))
+              )}
+            </div>
+            <button onClick={() => setSharingItemId(null)}
+              className="w-full px-4 py-2 text-sm text-foreground/60 hover:text-foreground border-secondary border-t border-l border-r-6 border-b-6">
+              CANCEL
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
