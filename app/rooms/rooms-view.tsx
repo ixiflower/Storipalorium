@@ -2,13 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Copy, Check, Trash2, Settings, Users, LogIn } from 'lucide-react';
+import { Plus, Copy, Check, Trash2, Settings, Users, LogIn, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import type { RoomSettings } from '@/lib/db-schema';
 import { defaultRoomSettings, parseRoomSettings } from '@/lib/db-schema';
 
 type Room = {
   id: string; name: string; code: string; ownerId: string;
   settings: string | null; createdAt: Date | null;
+};
+
+type Member = {
+  id: string; userId: string; roomId: string; joinedAt: Date | string | null;
 };
 
 export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; userId: string }) {
@@ -20,6 +24,9 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
   const [settingsRoom, setSettingsRoom] = useState<Room | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [membersRoom, setMembersRoom] = useState<string | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const router = useRouter();
 
   const ic = "bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-3 py-2 text-sm h-10";
@@ -58,6 +65,23 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
       setRooms(p => p.map(r => r.id === roomId ? d.room : r));
       setMsg('Settings saved.');
     } else setMsg(d.error || 'Failed');
+  };
+
+  const toggleMembers = async (roomId: string) => {
+    if (membersRoom === roomId) { setMembersRoom(null); setMembers([]); return; }
+    setMembersRoom(roomId);
+    setLoadingMembers(true);
+    try {
+      const res = await fetch(`/api/rooms/members?roomId=${roomId}`);
+      const d = await res.json();
+      if (d.members) setMembers(d.members);
+    } catch { setMembers([]); }
+    setLoadingMembers(false);
+  };
+
+  const formatDate = (d: Date | string | null) => {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
@@ -102,6 +126,11 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
                   </div>
                   <div className="flex items-center gap-2">
                     {room.ownerId === userId && (
+                      <button onClick={() => toggleMembers(room.id)} className={`${bc} text-xs`}>
+                        <Users className="w-3.5 h-3.5" /> Members
+                      </button>
+                    )}
+                    {room.ownerId === userId && (
                       <button onClick={() => setSettingsRoom(settingsRoom?.id === room.id ? null : room)} className={`${bc} text-xs`}>
                         <Settings className="w-3.5 h-3.5" /> Settings
                       </button>
@@ -113,6 +142,40 @@ export function RoomsView({ rooms: initialRooms, userId }: { rooms: Room[]; user
                     )}
                   </div>
                 </div>
+
+                {/* Members Panel */}
+                {membersRoom === room.id && (
+                  <div className="p-4 border-t border-secondary space-y-2">
+                    <div className="text-foreground/60 text-sm mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-accent" />
+                      {loadingMembers ? 'Loading...' : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+                    </div>
+                    {loadingMembers ? (
+                      <div className="text-foreground/30 text-sm">Loading members...</div>
+                    ) : members.length === 0 ? (
+                      <div className="text-foreground/40 text-sm">No members found.</div>
+                    ) : (
+                      <div className="space-y-1">
+                        {members.map(m => (
+                          <div key={m.id} className="flex items-center justify-between text-sm py-1 px-2 hover:bg-foreground/[0.02]">
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="text-foreground/70 truncate max-w-[300px]">{m.userId}</span>
+                              {m.userId === room.ownerId && (
+                                <span className="text-accent/60 text-xs shrink-0">(owner)</span>
+                              )}
+                              {m.userId === userId && !(room.ownerId === userId) && (
+                                <span className="text-foreground/30 text-xs shrink-0">(you)</span>
+                              )}
+                            </div>
+                            <span className="text-foreground/30 text-xs flex items-center gap-1 shrink-0">
+                              <Clock className="w-3 h-3" /> {formatDate(m.joinedAt)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Settings Panel */}
                 {settingsRoom?.id === room.id && (
