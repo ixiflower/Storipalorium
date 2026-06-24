@@ -334,6 +334,7 @@ export default function CreatePage() {
           )}
 
           {/* Form */}
+          {bookmarks.length === 0 && (
           <div className="grid gap-14 md:grid-cols-[240px_1fr] items-start">
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">Title</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)}
@@ -360,12 +361,15 @@ export default function CreatePage() {
               )}
             </div>
           </div>
+          )}
 
           {error && <div className="mt-4 text-destructive text-sm">{error}</div>}
 
           <div className="mt-10 flex justify-end gap-6">
             <Button variant="outline" className="px-8 py-3 text-xl text-foreground border-foreground border-t border-l border-r-6 border-b-6" onClick={() => { setOpen(false); setError(''); setBookmarks([]); }}>CANCEL</Button>
+            {bookmarks.length === 0 && (
             <Button variant="outline" className="px-8 py-3 text-xl text-foreground border-secondary border-t border-l border-r-6 border-b-6 disabled:opacity-50" onClick={handleSave} disabled={saving}>{saving ? 'SAVING...' : 'SAVE'}</Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
