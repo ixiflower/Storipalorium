@@ -46,7 +46,7 @@ const methodColors: Record<string, string> = {
   GET: 'text-green-400', POST: 'text-yellow-400', PATCH: 'text-blue-400', DELETE: 'text-red-400',
 };
 
-export function APIDocs({ userId, tokens: initialTokens }: { userId: string; tokens: Token[] }) {
+export function APIDocs({ userId, tokens: initialTokens }: { userId: string | null; tokens: Token[] }) {
   const [tokens, setTokens] = useState(initialTokens);
   const [activeSection, setActiveSection] = useState('overview');
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['getting-started', 'items', 'rooms']));
@@ -141,12 +141,22 @@ export function APIDocs({ userId, tokens: initialTokens }: { userId: string; tok
             <div className="mt-12 border-t border-secondary pt-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl text-foreground flex items-center gap-2"><Key className="w-5 h-5 text-accent" /> Your API Tokens</h2>
-                {!showTokenCreator && (
+                {userId && !showTokenCreator && (
                   <button onClick={() => setShowTokenCreator(true)} className="px-3 py-1.5 text-sm text-foreground border-secondary border-t border-l border-r-6 border-b-6 hover:border-foreground/40 transition-colors flex items-center gap-1">
                     <Plus className="w-3.5 h-3.5" /> New Token
                   </button>
                 )}
               </div>
+
+              {!userId ? (
+                <div className="p-6 border-secondary border-t border-l border-r-6 border-b-6 text-center space-y-3">
+                  <p className="text-foreground/50 text-sm">You must be logged in to create and manage API tokens.</p>
+                  <a href="/login" className="inline-block px-6 py-2 text-sm text-foreground border-accent border-t border-l border-r-6 border-b-6 hover:border-foreground/40 transition-colors">
+                    Login to continue
+                  </a>
+                </div>
+              ) : (
+              <>
 
               {showTokenCreator && (
                 <div className="mb-6 p-4 border-secondary border-t border-l border-r-6 border-b-6 space-y-3">
@@ -199,6 +209,7 @@ export function APIDocs({ userId, tokens: initialTokens }: { userId: string; tok
                   ))}
                 </div>
               )}
+              </>)}
             </div>
           </div>
         </div>
