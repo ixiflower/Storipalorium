@@ -1,10 +1,19 @@
-export default function APIPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">API Page</h1>
-        <p className="mt-4 text-gray-600">This is the API page</p>
-      </div>
-    </div>
-  );
+import { auth } from '@/lib/auth/server';
+import { db } from '@/lib/db';
+import { apiTokens } from '@/lib/db-schema';
+import { eq } from 'drizzle-orm';
+import { redirect } from 'next/navigation';
+import { APIDocs } from './api-docs';
+
+export const dynamic = 'force-dynamic';
+
+export default async function APIPage() {
+  const { data: session } = await auth.getSession();
+  if (!session?.user) redirect('/login');
+
+  const tokens = await db.select().from(apiTokens)
+    .where(eq(apiTokens.userId, session.user.id))
+    .orderBy(apiTokens.createdAt);
+
+  return <APIDocs userId={session.user.id} tokens={tokens} />;
 }

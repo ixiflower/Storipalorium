@@ -45,6 +45,15 @@ export const items = pgTable('items', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
+export const apiTokens = pgTable('api_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  token: text('token').notNull().unique(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
 // Relations
 export const roomsRelations = relations(rooms, ({ many }) => ({
   members: many(roomMembers),
@@ -65,6 +74,7 @@ export type NewRoom = typeof rooms.$inferInsert;
 export type RoomMember = typeof roomMembers.$inferSelect;
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
+export type ApiToken = typeof apiTokens.$inferSelect;
 
 // Helper: parse room settings with defaults
 export function parseRoomSettings(raw: string | null | undefined): RoomSettings {
