@@ -57,7 +57,7 @@ export function Navbar() {
           <XIcon className="size-8" />
           <span className="sr-only">Close</span>
         </button>
-        <div className="flex flex-col h-full w-full py-12 px-8">
+        <div className="flex flex-col h-full w-full py-12 px-8 overflow-y-auto">
           <h2 className="sr-only">Menu</h2>
 
           <nav className="flex flex-col space-y-6 mb-8">
