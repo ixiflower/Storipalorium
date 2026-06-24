@@ -260,7 +260,7 @@ export default function CreatePage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-3xl md:max-w-5xl p-8 border-secondary border-t border-l border-r-6 border-b-6 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl md:max-w-5xl p-8 border-secondary border-t border-l border-r-6 border-b-6 max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogTitle className="sr-only">Add Item</DialogTitle>
 
           {/* Save target + Import button */}
@@ -284,7 +284,7 @@ export default function CreatePage() {
 
           {/* Bookmark import preview */}
           {bookmarks.length > 0 && (
-            <div className="mb-8 p-4 border-secondary border-t border-l border-r-6 border-b-6 space-y-4">
+            <div className="mb-8 p-4 border-secondary border-t border-l border-r-6 border-b-6 space-y-4 w-full overflow-hidden">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-foreground text-lg flex items-center gap-2">
                   <FileText className="w-5 h-5 text-accent" />
