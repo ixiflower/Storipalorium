@@ -79,6 +79,7 @@ export default function CreatePage() {
 
   // Bookmark import state
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarkEntry[]>([]);
   const [importRoom, setImportRoom] = useState('private');
   const [importing, setImporting] = useState(false);
@@ -98,6 +99,19 @@ export default function CreatePage() {
     setOpen(true);
   }, []);
 
+  const handleLinkChange = (value: string) => {
+    setLink(value);
+    if (!looksLikeUrl(value) || title.trim()) return;
+    // Debounce: fetch title after 800ms of no typing
+    if (fetchTimer.current) clearTimeout(fetchTimer.current);
+    fetchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/fetch-title?url=${encodeURIComponent(value.trim())}`);
+        const d = await res.json();
+        if (d.title && !title) setTitle(d.title);
+      } catch {}
+    }, 800);
+  };
   const handleSave = async () => {
     const finalCategory = customCat.trim() || category;
     if (!title.trim()) { setError('Title is required'); return; }
@@ -359,7 +373,7 @@ export default function CreatePage() {
               className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl h-14" />
 
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">Link</label>
-            <textarea value={link} onChange={(e) => setLink(e.target.value)}
+            <textarea value={link} onChange={(e) => handleLinkChange(e.target.value)}
               className="w-full bg-transparent text-foreground border-secondary border-t border-l border-r-6 border-b-6 px-4 py-3 text-xl min-h-48" />
             <label className="text-foreground text-2xl text-left md:self-start md:pr-6">Category</label>
             <div className="space-y-2">
