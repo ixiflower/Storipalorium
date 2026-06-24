@@ -71,13 +71,14 @@ export async function PATCH(request: Request) {
         // In a room: check room edit permissions
         const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
         if (room.length) {
-          const settings = parseRoomSettings(room[0].settings);
-          if (settings.whoCanEdit === 'owner' && room[0].ownerId !== session.user.id) {
-            return error('Only the room owner can edit items', 403);
+          // Room owner always has full control
+          if (room[0].ownerId !== session.user.id) {
+            const settings = parseRoomSettings(room[0].settings);
+            if (settings.whoCanEdit === 'owner') {
+              return error('Only the room owner can edit items', 403);
+            }
+            if (settings.whoCanEdit === 'own') return error('You can only edit your own items', 403);
           }
-          // 'anyone' — allowed; 'own' — current user isn't owner, blocked
-          if (settings.whoCanEdit === 'own') return error('You can only edit your own items', 403);
-          // 'anyone' — fall through to allow
         }
       } else {
         return error('Not your item', 403);
@@ -112,11 +113,14 @@ export async function DELETE(request: Request) {
       if (target.roomId) {
         const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
         if (room.length) {
-          const settings = parseRoomSettings(room[0].settings);
-          if (settings.whoCanDelete === 'owner' && room[0].ownerId !== session.user.id) {
-            return error('Only the room owner can delete items', 403);
+          // Room owner always has full control
+          if (room[0].ownerId !== session.user.id) {
+            const settings = parseRoomSettings(room[0].settings);
+            if (settings.whoCanDelete === 'owner') {
+              return error('Only the room owner can delete items', 403);
+            }
+            if (settings.whoCanDelete === 'own') return error('You can only delete your own items', 403);
           }
-          if (settings.whoCanDelete === 'own') return error('You can only delete your own items', 403);
         }
       } else {
         return error('Not your item', 403);

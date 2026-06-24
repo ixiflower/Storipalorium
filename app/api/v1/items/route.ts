@@ -53,9 +53,9 @@ export async function PATCH(request: Request) {
   if (target.userId !== userId) {
     if (target.roomId) {
       const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
-      if (room.length) {
+      if (room.length && room[0].ownerId !== userId) {
         const s = parseRoomSettings(room[0].settings);
-        if (s.whoCanEdit === 'owner' && room[0].ownerId !== userId) return err('Only owner can edit', 403);
+        if (s.whoCanEdit === 'owner') return err('Only owner can edit', 403);
         if (s.whoCanEdit === 'own') return err('Can only edit own items', 403);
       }
     } else return err('Not your item', 403);
@@ -83,9 +83,9 @@ export async function DELETE(request: Request) {
   if (target.userId !== userId) {
     if (target.roomId) {
       const room = await db.select().from(rooms).where(eq(rooms.id, target.roomId)).limit(1);
-      if (room.length) {
+      if (room.length && room[0].ownerId !== userId) {
         const s = parseRoomSettings(room[0].settings);
-        if (s.whoCanDelete === 'owner' && room[0].ownerId !== userId) return err('Only owner can delete', 403);
+        if (s.whoCanDelete === 'owner') return err('Only owner can delete', 403);
         if (s.whoCanDelete === 'own') return err('Can only delete own items', 403);
       }
     } else return err('Not your item', 403);
