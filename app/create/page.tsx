@@ -18,7 +18,7 @@ function setCookie(name: string, value: string, days = 365) {
 }
 
 type Room = { id: string; name: string; code: string; ownerId: string };
-type BookmarkEntry = { title: string; url: string; tags: string; description: string; selected: boolean };
+type BookmarkEntry = { title: string; url: string; tags: string; description: string; selected: boolean; duplicate: boolean; action: 'skip' | 'replace' };
 const defaultCategories = ['notes', 'links', 'media'];
 
 function parseBookmarks(html: string): BookmarkEntry[] {
@@ -50,6 +50,8 @@ function parseBookmarks(html: string): BookmarkEntry[] {
       tags: link.tags,
       description: desc.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#x27;/g, "'"),
       selected: true,
+      duplicate: false,
+      action: 'skip',
     });
   }
 
@@ -157,13 +159,29 @@ export default function CreatePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const html = reader.result as string;
       const entries = parseBookmarks(html);
       setBookmarks(entries);
       setImportRoom(selectedRoomId);
       setImportMsg('');
       setImportProgress(null);
+
+      // Check for duplicates against existing items
+      try {
+        const res = await fetch('/api/items');
+        const data = await res.json();
+        const existingUrls = new Set((data.items || []).map((i: { link: string }) => i.link).filter(Boolean));
+        const updated = entries.map(b => {
+          if (b.url && existingUrls.has(b.url)) {
+            return { ...b, duplicate: true, selected: false, action: 'skip' as const };
+          }
+          return b;
+        });
+        const dupes = updated.filter(b => b.duplicate).length;
+        if (dupes > 0) setImportMsg(`${dupes} duplicate${dupes > 1 ? 's' : ''} found — skipped by default. Change action per item below.`);
+        setBookmarks(updated);
+      } catch {}
     };
     reader.readAsText(file);
     // Reset so same file can be re-picked
@@ -180,21 +198,35 @@ export default function CreatePage() {
   };
 
   const importBookmarks = async () => {
-    const toImport = bookmarks.filter(b => b.selected);
+    const toImport = bookmarks.filter(b => b.selected || (b.duplicate && b.action === 'replace'));
     if (!toImport.length) { setImportMsg('No bookmarks selected.'); return; }
     setImporting(true); setImportMsg(''); setImportProgress({ current: 0, total: toImport.length });
-    let ok = 0; let fail = 0;
+    let ok = 0; let fail = 0; let skipped = 0;
     for (let i = 0; i < toImport.length; i++) {
       const b = toImport[i];
       setImportProgress({ current: i + 1, total: toImport.length });
       try {
+        if (b.duplicate && b.action === 'replace') {
+          // Find and update existing item with same URL
+          const listRes = await fetch('/api/items');
+          const listData = await listRes.json();
+          const existing = (listData.items || []).find((x: { link: string }) => x.link === b.url);
+          if (existing) {
+            const updRes = await fetch('/api/items', {
+              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: existing.id, title: b.title, tags: b.tags }),
+            });
+            if (updRes.ok) ok++; else fail++;
+            continue;
+          }
+        }
         const body: Record<string, string> = { title: b.title, link: b.url, category: 'links', tags: b.tags };
         if (importRoom !== 'private') body.roomId = importRoom;
         const res = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (res.ok) ok++; else fail++;
       } catch { fail++; }
     }
-    setImportMsg(`Done: ${ok} imported, ${fail} failed.`);
+    setImportMsg(`Done: ${ok} imported, ${fail} failed, ${bookmarks.filter(b => b.duplicate && b.action === 'skip').length} duplicates skipped.`);
     setImportProgress(null);
     setImporting(false);
     if (ok > 0) { setBookmarks([]); router.refresh(); }
@@ -281,13 +313,26 @@ export default function CreatePage() {
               {/* Bookmark list */}
               <div className="max-h-64 overflow-y-auto space-y-1 border-t border-l border-secondary pl-2 pt-2">
                 {bookmarks.map((b, idx) => (
-                  <label key={idx} className="flex items-start gap-2 py-1 hover:bg-foreground/[0.02] cursor-pointer text-sm">
+                  <label key={idx} className={`flex items-start gap-2 py-1 hover:bg-foreground/[0.02] cursor-pointer text-sm ${b.duplicate ? 'opacity-70' : ''}`}>
                     <input type="checkbox" checked={b.selected} onChange={() => toggleBookmark(idx)}
                       className="accent-accent mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <div className="text-foreground/70 text-sm break-all">{b.title}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-foreground/70 truncate">{b.title}</span>
+                        {b.duplicate && <span className="text-yellow-400/60 text-xs shrink-0 font-bold">DUPLICATE</span>}
+                      </div>
                       <div className="text-foreground/30 text-xs break-all mt-0.5">{b.url}</div>
                       {b.tags && <div className="text-accent/40 text-xs mt-0.5">{b.tags}</div>}
+                      {b.duplicate && (
+                        <select
+                          value={b.action}
+                          onChange={(e) => setBookmarks(p => p.map((x, i) => i === idx ? { ...x, action: e.target.value as 'skip' | 'replace', selected: e.target.value === 'replace' } : x))}
+                          className="mt-1 bg-transparent text-foreground/60 text-xs border-secondary border-t border-l border-r-6 border-b-6 px-1 py-0.5"
+                        >
+                          <option className="bg-background" value="skip">Skip</option>
+                          <option className="bg-background" value="replace">Replace</option>
+                        </select>
+                      )}
                     </div>
                   </label>
                 ))}
