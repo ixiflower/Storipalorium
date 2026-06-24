@@ -311,9 +311,9 @@ export default function CreatePage() {
               </label>
 
               {/* Bookmark list */}
-              <div className="max-h-64 overflow-y-auto space-y-1 border-t border-l border-secondary pl-2 pt-2">
+              <div className="max-h-64 overflow-y-auto overflow-x-hidden max-w-full space-y-1 border-t border-l border-secondary pl-2 pt-2">
                 {bookmarks.map((b, idx) => (
-                  <label key={idx} className={`flex items-start gap-2 py-1 hover:bg-foreground/[0.02] cursor-pointer text-sm ${b.duplicate ? 'opacity-70' : ''}`}>
+                  <label key={idx} className={`flex items-start gap-2 py-1 hover:bg-foreground/[0.02] cursor-pointer text-sm min-w-0 ${b.duplicate ? 'opacity-70' : ''}`}>
                     <input type="checkbox" checked={b.selected} onChange={() => toggleBookmark(idx)}
                       className="accent-accent mt-0.5 shrink-0" />
                     <div className="min-w-0 flex-1">
