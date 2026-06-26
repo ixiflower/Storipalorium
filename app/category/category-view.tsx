@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen, Pencil, Share2 } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronRight, ArrowUpDown, Clock, Type, Search, X, Folder, FolderOpen, Pencil, Share2, Hash } from 'lucide-react';
 
 type Item = {
   id: string; title: string; link: string | null; category: string;
@@ -195,6 +195,7 @@ export function CategoryView({
   const [sharingItemId, setSharingItemId] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const totalItems = privateItems.length + Object.values(roomItemsMap).reduce((s, a) => s + a.length, 0);
 
   const allItemsWithSource = useMemo(() => {
@@ -250,7 +251,7 @@ export function CategoryView({
   };
 
   const results = useMemo(() => {
-    if (!query.trim() && selectedTags.size === 0) return null;
+    if (!query.trim() && selectedTags.size === 0 && !selectedRoom) return null;
     const q = query.toLowerCase().trim();
     return allItemsWithSource.filter(({ item }) => {
       // Search filter
@@ -269,11 +270,14 @@ export function CategoryView({
           if (!itemTags.has(t)) return false;
         }
       }
+      // Room filter
+      if (selectedRoom === 'private' && item.roomId !== null) return false;
+      if (selectedRoom && selectedRoom !== 'private' && item.roomId !== selectedRoom) return false;
       return true;
     });
-  }, [allItemsWithSource, query, selectedTags]);
+  }, [allItemsWithSource, query, selectedTags, selectedRoom]);
 
-  const isFiltering = query.trim().length > 0 || selectedTags.size > 0;
+  const isFiltering = query.trim().length > 0 || selectedTags.size > 0 || selectedRoom !== null;
 
   return (
     <div className="min-h-screen pt-24 px-8 md:px-16 pb-20">
@@ -297,28 +301,50 @@ export function CategoryView({
               </button>
             )}
           </div>
-          {/* Tag filter chips */}
-          {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
-              {allTags.map(tag => {
-                const active = selectedTags.has(tag);
-                return (
-                  <button key={tag} onClick={() => toggleTag(tag)}
-                    className={`text-xs transition-colors cursor-pointer ${
-                      active
-                        ? 'text-accent'
-                        : 'text-foreground/30 hover:text-foreground/60'
-                    }`}
+          {/* Tag filter chips + room filter */}
+          {(allTags.length > 0 || userRooms.length > 0) && (
+            <div className="flex items-start justify-between mt-3 gap-4">
+              {/* Tag chips */}
+              {allTags.length > 0 ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 flex-1 min-w-0">
+                  {allTags.map(tag => {
+                    const active = selectedTags.has(tag);
+                    return (
+                      <button key={tag} onClick={() => toggleTag(tag)}
+                        className={`text-xs transition-colors cursor-pointer ${
+                          active
+                            ? 'text-accent'
+                            : 'text-foreground/30 hover:text-foreground/60'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                  {selectedTags.size > 0 && (
+                    <button onClick={() => setSelectedTags(new Set())}
+                      className="text-xs text-foreground/20 hover:text-destructive transition-colors">
+                      clear
+                    </button>
+                  )}
+                </div>
+              ) : <div className="flex-1" />}
+              {/* Room filter — right side */}
+              {userRooms.length > 0 && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Hash className="w-3.5 h-3.5 text-foreground/30" />
+                  <select
+                    value={selectedRoom || ''}
+                    onChange={(e) => setSelectedRoom(e.target.value || null)}
+                    className="bg-transparent text-foreground/50 text-xs border-secondary border-t border-l border-r-4 border-b-4 px-2 py-1 outline-none cursor-pointer appearance-none"
                   >
-                    {tag}
-                  </button>
-                );
-              })}
-              {selectedTags.size > 0 && (
-                <button onClick={() => setSelectedTags(new Set())}
-                  className="text-xs text-foreground/20 hover:text-destructive transition-colors">
-                  clear
-                </button>
+                    <option value="" className="bg-background text-foreground">All rooms</option>
+                    <option value="private" className="bg-background text-foreground">Private</option>
+                    {userRooms.map(r => (
+                      <option key={r.id} value={r.id} className="bg-background text-foreground">{r.name}</option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
           )}
